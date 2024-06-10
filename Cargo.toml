@@ -1,7 +1,8 @@
+workspace = { members = ["engine"] }
 [package]
-name = "eframe_template"
+name = "hackem"
 version = "0.1.0"
-authors = ["Emil Ernerfeldt <emil.ernerfeldt@gmail.com>"]
+authors = ["paulmoore100@hotmail.com"]
 edition = "2021"
 include = ["LICENSE-APACHE", "LICENSE-MIT", "**/*.rs", "Cargo.toml"]
 rust-version = "1.76"
@@ -19,9 +20,13 @@ eframe = { version = "0.27.0", default-features = false, features = [
     "persistence",   # Enable restoring app state when restarting the app.
 ] }
 log = "0.4"
+engine = {path ="engine"}
 
 # You only need serde if you want app persistence:
 serde = { version = "1", features = ["derive"] }
+rfd = "0.14.1"
+tempfile = "3.10.1"
+
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
