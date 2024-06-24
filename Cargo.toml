@@ -26,6 +26,10 @@ engine = {path ="engine"}
 serde = { version = "1", features = ["derive"] }
 rfd = "0.14.1"
 tempfile = "3.10.1"
+anyhow = "1.0.86"
+simplelog = "0.12.2"
+web-time = "1.1.0"
+
 
 
 # native:

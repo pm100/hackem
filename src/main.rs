@@ -1,12 +1,18 @@
 #![warn(clippy::all, rust_2018_idioms)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
+use hackem::HackEmulator;
+use simplelog::*;
+use std::fs::File;
 
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
-    use hackem::HackEmulator;
-
-    env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
+    CombinedLogger::init(vec![WriteLogger::new(
+        LevelFilter::Info,
+        Config::default(),
+        File::create("my_rust_binary.log").unwrap(),
+    )])
+    .unwrap();
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
