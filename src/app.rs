@@ -48,8 +48,6 @@ impl HackEmulator {
             last_draw_time: Instant::now(),
             start: Instant::now(),
             elapsed: Duration::from_secs(0),
-            //   request_state: Rc::new(Cell::new(RequestState::Idle)),
-            // request_data: Rc::new(RefCell::new(String::new())),
         };
 
         app
@@ -196,7 +194,6 @@ impl eframe::App for HackEmulator {
             // The top panel is often a good place for a menu bar:
 
             egui::menu::bar(ui, |ui| {
-                // NOTE: no File->Quit on web pages!
                 #[cfg(target_arch = "wasm32")]
                 self.wasm_update_and_menu(ui);
                 #[cfg(not(target_arch = "wasm32"))]
@@ -228,12 +225,12 @@ impl eframe::App for HackEmulator {
             }
         });
 
-        // egui::Window::new("screen")
-        //     .default_height(500.0)
-        //     .show(ctx, |ui| self.draw_screen(ui));
-        egui::Window::new("screen2")
+        egui::Window::new("screen")
             .default_height(500.0)
-            .show(ctx, |ui| self.draw_screen2(ui));
+            .show(ctx, |ui| self.draw_screen(ui));
+        // egui::Window::new("screen2")
+        //     .default_height(500.0)
+        //     .show(ctx, |ui| self.draw_screen2(ui));
         egui::Window::new("CPU")
             .default_height(500.0)
             .show(ctx, |ui| self.draw_cpu_state(ui));
@@ -242,17 +239,17 @@ impl eframe::App for HackEmulator {
             .show(ctx, |ui| self.draw_ram(ui));
 
         if self.running {
-            let stop = self.hacksys.execute_instructions(1000_000);
-            //  println!("{:?}", stop);
+            let stop = self.hacksys.execute_instructions(1000_000_000);
+            println!("{:?}", stop);
             match stop {
                 StopReason::SysHalt | StopReason::HardLoop => {
                     self.running = false;
                     self.elapsed = Instant::now() - self.start;
                 }
                 StopReason::ScreenUpdate(addr) => {
-                    self.update_pixels(addr);
+                    // self.update_pixels(addr);
 
-                    ctx.request_repaint();
+                    //ctx.request_repaint();
                 }
                 StopReason::Count => {
                     ctx.request_repaint();

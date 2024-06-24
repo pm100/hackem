@@ -124,7 +124,16 @@ impl HackEngine {
     pub(crate) fn execute_instructions(&mut self, count: usize) -> StopReason {
         let now = Instant::now();
         self.speed = 0.0;
+        let mut counter = 0;
         for _ in 0..count {
+            counter = counter + 1;
+            if counter > 1000 {
+                let time = Instant::now() - now;
+                if time > Duration::from_millis(20) {
+                    return StopReason::Count;
+                }
+                counter = 0;
+            }
             self.inst_count += 1;
 
             let instruction = self.rom[self.pc as usize];
@@ -163,7 +172,7 @@ impl HackEngine {
                     if d & 0x1 != 0 {
                         let res = self.set_ram(self.a, alu_out);
                         if res != StopReason::None {
-                            return res;
+                            //return res;
                         }
                     }
                     if d & 0x2 != 0 {
