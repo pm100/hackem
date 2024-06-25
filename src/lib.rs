@@ -2,11 +2,12 @@
 
 mod app;
 mod hacksys;
+mod key_lookup;
 #[cfg(target_arch = "wasm32")]
 mod wasm;
-use web_time::{Duration, Instant};
-
+use crate::app::CURRENT_KEY;
 pub use app::HackEmulator;
+use web_time::{Duration, Instant};
 mod code_loader;
 use anyhow::{bail, Result};
 pub struct HackEngine {
@@ -77,10 +78,10 @@ impl HackEngine {
         //  println!("out: {}", out);
         out
     }
-    fn set_ram(&mut self, address: u16, value: u16) -> StopReason {
+    fn set_ram(&mut self, address: u16, value: u16) {
         if address >= 0x8000 {
             println!("Invalid address {:04x} at {:04x}", address, self.pc);
-            return StopReason::Error(format!("Invalid address {} at {}", address, self.pc));
+            //  return StopReason::Error(format!("Invalid address {} at {}", address, self.pc));
         }
 
         match address {
@@ -91,17 +92,6 @@ impl HackEngine {
                 // screen
                 let old = self.ram[address as usize];
                 self.ram[address as usize] = value;
-                if old != value {
-                    // trace!(
-                    //     "Screen update:0x{:04x} {:04x} => {:04x} {}",
-                    //     address,
-                    //     old,
-                    //     value,
-                    //     self.inst_count - self.last_count
-                    // );
-                    self.last_count = self.inst_count;
-                    return StopReason::ScreenUpdate(address);
-                }
             }
             0x6000 => {
                 // keyboard - meaningless here
@@ -111,25 +101,31 @@ impl HackEngine {
                 self.ram[address as usize] = value;
             }
         }
-        return StopReason::None;
     }
     fn get_ram(&mut self, address: u16) -> u16 {
         if address == 0x6000 {
             // keyboard
             // read from keyboard
-            return 0;
+            unsafe {
+                //  println!("Current key: {}", CURRENT_KEY as u16);
+                return CURRENT_KEY as u16;
+            }
         }
         self.ram[address as usize]
     }
-    pub(crate) fn execute_instructions(&mut self, count: usize) -> StopReason {
+    pub(crate) fn execute_instructions(&mut self, run_time: Duration) -> StopReason {
         let now = Instant::now();
         self.speed = 0.0;
         let mut counter = 0;
-        for _ in 0..count {
+        let inst_count_snap = self.inst_count;
+        loop {
             counter = counter + 1;
             if counter > 1000 {
                 let time = Instant::now() - now;
-                if time > Duration::from_millis(20) {
+                if time > run_time {
+                    let time = Instant::now() - now;
+                    self.speed =
+                        (self.inst_count - inst_count_snap) as f32 / time.as_secs_f32() / 1000000.0;
                     return StopReason::Count;
                 }
                 counter = 0;
@@ -170,10 +166,7 @@ impl HackEngine {
                     let y = if a == 0 { self.a } else { self.get_ram(self.a) };
                     let alu_out = Self::alu(self.d, y, c);
                     if d & 0x1 != 0 {
-                        let res = self.set_ram(self.a, alu_out);
-                        if res != StopReason::None {
-                            //return res;
-                        }
+                        self.set_ram(self.a, alu_out);
                     }
                     if d & 0x2 != 0 {
                         self.d = alu_out;
@@ -207,10 +200,10 @@ impl HackEngine {
                     return StopReason::Error("Invalid opcode".to_string());
                 }
             }
+            if run_time == Duration::ZERO {
+                return StopReason::Count;
+            }
         }
-        let time = Instant::now() - now;
-        self.speed = count as f32 / time.as_secs_f32() / 1000000.0;
-        StopReason::Count
     }
 }
 #[macro_export]

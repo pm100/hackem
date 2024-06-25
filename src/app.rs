@@ -1,6 +1,6 @@
-use crate::hacksys::HackSystem;
 use crate::StopReason;
-use egui::{vec2, Color32, Painter, Pos2, Rect, Sense, TextureHandle, Ui, Vec2};
+use crate::{hacksys::HackSystem, key_lookup::lookup_key};
+use egui::{vec2, Color32, InputState, Key, Painter, Pos2, Rect, Sense, TextureHandle, Ui, Vec2};
 
 use web_time::{Duration, Instant};
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
@@ -18,11 +18,15 @@ pub struct HackEmulator {
     last_draw_time: Instant,
     start: Instant,
     elapsed: Duration,
+    text: String,
 }
 
 const SCREEN_WIDTH: usize = 512;
 const SCREEN_HEIGHT: usize = 256;
 
+// ascii value of current key
+
+pub(crate) static mut CURRENT_KEY: u8 = 0;
 impl HackEmulator {
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
@@ -48,6 +52,7 @@ impl HackEmulator {
             last_draw_time: Instant::now(),
             start: Instant::now(),
             elapsed: Duration::from_secs(0),
+            text: String::new(),
         };
 
         app
@@ -96,60 +101,13 @@ impl HackEmulator {
             ui.end_row();
         });
     }
-    fn draw_word(&self, word: u16) -> [Color32; 16] {
-        let mut result = [Color32::BLACK; 16];
-        for i in 0..16 {
-            if word & (1 << i) != 0 {
-                result[i] = egui::Color32::WHITE;
-            }
-        }
-        result
-    }
 
-    fn update_pixels(&mut self, addr: u16) {
-        let screen = self.hacksys.get_screen_ram();
-        let addr = addr - 0x4000;
-        let pix_word = screen[addr as usize];
-
-        let row = addr as usize / (SCREEN_WIDTH / 16);
-        let col = addr as usize % (SCREEN_WIDTH / 16);
-        let word = self.draw_word(pix_word);
-        //   println!("row: {} col: {} ", row, col);
-        //self.pixels[(row * SCREEN_WIDTH) + col * 16..row * SCREEN_WIDTH + col * 16 + 16]
-        //  .copy_from_slice(&word);
-        let img = egui::ColorImage {
-            size: [16, 1],
-            pixels: word.to_vec(),
-        };
-        self.texture
-            .set_partial([col * 16, row], img, egui::TextureOptions::LINEAR);
-    }
-    fn build_texture(&mut self) {
-        self.texture.set(
-            egui::ColorImage {
-                size: [SCREEN_WIDTH, SCREEN_HEIGHT],
-                pixels: self.pixels.clone(),
-            },
-            egui::TextureOptions::NEAREST,
-        );
-    }
-    fn draw_screen2(&mut self, ui: &mut Ui) {
-        let now = Instant::now();
-        if now - self.last_draw_time > std::time::Duration::from_millis(100) {
-            self.last_draw_time = now;
-            //  self.build_texture();
-        }
-        let size = self.texture.size_vec2();
-        let sized_texture = egui::load::SizedTexture::new(&self.texture, size);
-        ui.add(egui::Image::new(sized_texture).fit_to_exact_size(size));
-    }
     fn draw_screen(&mut self, ui: &mut Ui) {
         let color = if ui.style().visuals.dark_mode {
             egui::Color32::WHITE
         } else {
             egui::Color32::BLACK
         };
-        // println!("draw_screen {}", self.screen_ram[0]);
         let draw_area_size =
             Vec2::new(SCREEN_WIDTH as f32, SCREEN_HEIGHT as f32) + Vec2::splat(1.0);
         let (response, painter) = ui.allocate_painter(draw_area_size, Sense::hover());
@@ -189,7 +147,31 @@ impl eframe::App for HackEmulator {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Put your widgets into a `SidePanel`, `TopBottomPanel`, `CentralPanel`, `Window` or `Area`.
         // For inspiration and more examples, go to https://emilk.github.io/egui
-
+        ctx.input(|inp| {
+            // log::trace!("{:?}", inp);
+            if inp.keys_down.len() > 0 {
+                println!(
+                    "{:?} {:?} {} ",
+                    inp.keys_down,
+                    inp.modifiers,
+                    inp.keys_down.len()
+                );
+                lookup_key(inp);
+                println!("key: {}", unsafe { CURRENT_KEY as char });
+            } else {
+                unsafe {
+                    CURRENT_KEY = 0;
+                }
+            }
+            if let Some(ev) = inp.events.iter().next() {
+                if let egui::Event::Text(text) = ev {
+                    println!("{:?}", text);
+                    unsafe {
+                        CURRENT_KEY = text.chars().next().unwrap() as u8;
+                    }
+                }
+            }
+        });
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
 
@@ -215,7 +197,7 @@ impl eframe::App for HackEmulator {
                 egui::widgets::global_dark_light_mode_buttons(ui);
             });
             if ui.button("Step").clicked() {
-                self.hacksys.execute_instructions(1);
+                self.hacksys.execute_instructions(Duration::ZERO);
             }
 
             if ui.button("Run").clicked() {
@@ -228,9 +210,18 @@ impl eframe::App for HackEmulator {
         egui::Window::new("screen")
             .default_height(500.0)
             .show(ctx, |ui| self.draw_screen(ui));
-        // egui::Window::new("screen2")
-        //     .default_height(500.0)
-        //     .show(ctx, |ui| self.draw_screen2(ui));
+        egui::Window::new("xxxx")
+            .default_height(500.0)
+            .show(ctx, |ui| ctx.inspection_ui(ui));
+        egui::Window::new("screen2")
+            .default_height(500.0)
+            .show(ctx, |ui| {
+                //let mut string = "".to_string();
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.text).hint_text("Write something here"),
+                );
+                ui.end_row();
+            });
         egui::Window::new("CPU")
             .default_height(500.0)
             .show(ctx, |ui| self.draw_cpu_state(ui));
@@ -239,8 +230,8 @@ impl eframe::App for HackEmulator {
             .show(ctx, |ui| self.draw_ram(ui));
 
         if self.running {
-            let stop = self.hacksys.execute_instructions(1000_000_000);
-            println!("{:?}", stop);
+            let stop = self.hacksys.execute_instructions(Duration::from_millis(50));
+            // println!("{:?}", stop);
             match stop {
                 StopReason::SysHalt | StopReason::HardLoop => {
                     self.running = false;

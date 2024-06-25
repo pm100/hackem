@@ -8,7 +8,7 @@ use std::fs::File;
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
     CombinedLogger::init(vec![WriteLogger::new(
-        LevelFilter::Info,
+        LevelFilter::Trace,
         Config::default(),
         File::create("my_rust_binary.log").unwrap(),
     )])

@@ -1,5 +1,7 @@
 use std::marker;
 
+use web_time::Duration;
+
 use crate::{HackEmulator, HackEngine, StopReason};
 
 pub struct HackSystem {
@@ -49,8 +51,8 @@ impl HackSystem {
     pub fn get_speed(&self) -> f32 {
         self.engine.speed
     }
-    pub fn execute_instructions(&mut self, count: usize) -> StopReason {
-        self.engine.execute_instructions(count)
+    pub fn execute_instructions(&mut self, run_time: Duration) -> StopReason {
+        self.engine.execute_instructions(run_time)
     }
     pub fn load_file(&mut self, path: &str) {
         self.engine.load_file(path);
