@@ -147,31 +147,33 @@ impl eframe::App for HackEmulator {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Put your widgets into a `SidePanel`, `TopBottomPanel`, `CentralPanel`, `Window` or `Area`.
         // For inspiration and more examples, go to https://emilk.github.io/egui
-        ctx.input(|inp| {
-            // log::trace!("{:?}", inp);
-            if inp.keys_down.len() > 0 {
-                println!(
-                    "{:?} {:?} {} ",
-                    inp.keys_down,
-                    inp.modifiers,
-                    inp.keys_down.len()
-                );
-                lookup_key(inp);
-                println!("key: {}", unsafe { CURRENT_KEY as char });
-            } else {
-                unsafe {
-                    CURRENT_KEY = 0;
-                }
-            }
-            if let Some(ev) = inp.events.iter().next() {
-                if let egui::Event::Text(text) = ev {
-                    println!("{:?}", text);
+        if !ctx.wants_keyboard_input() {
+            ctx.input(|inp| {
+                // log::trace!("{:?}", inp);
+                if inp.keys_down.len() > 0 {
+                    println!(
+                        "{:?} {:?} {} ",
+                        inp.keys_down,
+                        inp.modifiers,
+                        inp.keys_down.len()
+                    );
+                    lookup_key(inp);
+                    println!("key: {}", unsafe { CURRENT_KEY as char });
+                } else {
                     unsafe {
-                        CURRENT_KEY = text.chars().next().unwrap() as u8;
+                        CURRENT_KEY = 0;
                     }
                 }
-            }
-        });
+                if let Some(ev) = inp.events.iter().next() {
+                    if let egui::Event::Text(text) = ev {
+                        println!("{:?}", text);
+                        unsafe {
+                            CURRENT_KEY = text.chars().next().unwrap() as u8;
+                        }
+                    }
+                }
+            });
+        }
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
 
@@ -201,7 +203,7 @@ impl eframe::App for HackEmulator {
             }
 
             if ui.button("Run").clicked() {
-                self.build_texture();
+                //     self.build_texture();
 
                 self.running = !self.running;
             }
