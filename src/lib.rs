@@ -123,7 +123,6 @@ impl HackEngine {
             if counter > 1000 {
                 let time = Instant::now() - now;
                 if time > run_time {
-                    let time = Instant::now() - now;
                     self.speed =
                         (self.inst_count - inst_count_snap) as f32 / time.as_secs_f32() / 1000000.0;
                     return StopReason::Count;

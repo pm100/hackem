@@ -1,4 +1,4 @@
-workspace = { members = ["engine"] }
+
 [package]
 name = "hackem"
 version = "0.1.0"
@@ -20,7 +20,7 @@ eframe = { version = "0.27.0", default-features = false, features = [
     "persistence",   # Enable restoring app state when restarting the app.
 ] }
 log = "0.4"
-engine = {path ="engine"}
+
 
 # You only need serde if you want app persistence:
 serde = { version = "1", features = ["derive"] }
