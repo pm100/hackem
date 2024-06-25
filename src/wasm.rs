@@ -29,7 +29,10 @@ impl HackEmulator {
                     unsafe { FILE_OPEN_STATE = RequestState::InFlight };
                     wasm_bindgen_futures::spawn_local(async move {
                         unsafe {
-                            let file = AsyncFileDialog::new().pick_file().await;
+                            let file = AsyncFileDialog::new()
+                                .add_filter("x", &["hx"])
+                                .pick_file()
+                                .await;
                             let data = file.unwrap().read().await;
                             let bin = String::from_utf8(data).unwrap();
                             FILE_OPEN_DATA = bin;

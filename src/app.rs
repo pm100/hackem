@@ -183,7 +183,9 @@ impl eframe::App for HackEmulator {
                 #[cfg(not(target_arch = "wasm32"))]
                 ui.menu_button("File", |ui| {
                     if ui.button("Load Binary").clicked() {
-                        if let Some(path) = rfd::FileDialog::new().pick_file() {
+                        if let Some(path) =
+                            rfd::FileDialog::new().add_filter("x", &["hx"]).pick_file()
+                        {
                             let bin = std::fs::read_to_string(path).unwrap();
                             self.hacksys.load_file(&bin);
                         }

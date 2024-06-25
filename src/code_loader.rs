@@ -8,13 +8,13 @@ enum LoadTarget {
 }
 
 impl HackEngine {
-    pub fn load_file(&mut self, file: &str) {
-        //let file = std::fs::read_to_string(path).unwrap();
+    pub fn load_file(&mut self, bin: &str) {
+      
         let mut address = 0;
         // peek at first line
-        if file.starts_with("hackem") {
+        if bin.starts_with("hackem") {
             let mut target = LoadTarget::None;
-            for line in file.lines() {
+            for line in bin.lines() {
                 let line = line.trim();
                 if line.is_empty() {
                     continue;
@@ -52,7 +52,7 @@ impl HackEngine {
                 }
             }
         } else {
-            for line in file.lines() {
+            for line in bin.lines() {
                 let line = line.trim();
                 if line.is_empty() {
                     continue;
