@@ -6,261 +6,261 @@ pub(crate) fn lookup_key(input: &InputState) {
     match input.keys_down.iter().next().unwrap() {
         Key::A => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'A' as u8;
+                CURRENT_KEY = b'A';
             } else {
-                CURRENT_KEY = 'a' as u8;
+                CURRENT_KEY = b'a';
             }
         },
         Key::B => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'B' as u8;
+                CURRENT_KEY = b'B';
             } else {
-                CURRENT_KEY = 'b' as u8;
+                CURRENT_KEY = b'b';
             }
         },
         Key::C => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'C' as u8;
+                CURRENT_KEY = b'C';
             } else {
-                CURRENT_KEY = 'c' as u8;
+                CURRENT_KEY = b'c';
             }
         },
         Key::D => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'D' as u8;
+                CURRENT_KEY = b'D';
             } else {
-                CURRENT_KEY = 'd' as u8;
+                CURRENT_KEY = b'd';
             }
         },
         Key::E => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'E' as u8;
+                CURRENT_KEY = b'E';
             } else {
-                CURRENT_KEY = 'e' as u8;
+                CURRENT_KEY = b'e';
             }
         },
         Key::F => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'F' as u8;
+                CURRENT_KEY = b'F';
             } else {
-                CURRENT_KEY = 'f' as u8;
+                CURRENT_KEY = b'f';
             }
         },
         Key::G => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'G' as u8;
+                CURRENT_KEY = b'G';
             } else {
-                CURRENT_KEY = 'g' as u8;
+                CURRENT_KEY = b'g';
             }
         },
         Key::H => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'H' as u8;
+                CURRENT_KEY = b'H';
             } else {
-                CURRENT_KEY = 'h' as u8;
+                CURRENT_KEY = b'h';
             }
         },
         Key::I => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'I' as u8;
+                CURRENT_KEY = b'I';
             } else {
-                CURRENT_KEY = 'i' as u8;
+                CURRENT_KEY = b'i';
             }
         },
         Key::J => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'J' as u8;
+                CURRENT_KEY = b'J';
             } else {
-                CURRENT_KEY = 'j' as u8;
+                CURRENT_KEY = b'j';
             }
         },
         Key::K => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'K' as u8;
+                CURRENT_KEY = b'K';
             } else {
-                CURRENT_KEY = 'k' as u8;
+                CURRENT_KEY = b'k';
             }
         },
         Key::L => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'L' as u8;
+                CURRENT_KEY = b'L';
             } else {
-                CURRENT_KEY = 'l' as u8;
+                CURRENT_KEY = b'l';
             }
         },
         Key::M => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'M' as u8;
+                CURRENT_KEY = b'M';
             } else {
-                CURRENT_KEY = 'm' as u8;
+                CURRENT_KEY = b'm';
             }
         },
         Key::N => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'N' as u8;
+                CURRENT_KEY = b'N';
             } else {
-                CURRENT_KEY = 'n' as u8;
+                CURRENT_KEY = b'n';
             }
         },
         Key::O => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'O' as u8;
+                CURRENT_KEY = b'O';
             } else {
-                CURRENT_KEY = 'o' as u8;
+                CURRENT_KEY = b'o';
             }
         },
         Key::P => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'P' as u8;
+                CURRENT_KEY = b'P';
             } else {
-                CURRENT_KEY = 'p' as u8;
+                CURRENT_KEY = b'p';
             }
         },
         Key::Q => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'Q' as u8;
+                CURRENT_KEY = b'Q';
             } else {
-                CURRENT_KEY = 'q' as u8;
+                CURRENT_KEY = b'q';
             }
         },
         Key::R => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'R' as u8;
+                CURRENT_KEY = b'R';
             } else {
-                CURRENT_KEY = 'r' as u8;
+                CURRENT_KEY = b'r';
             }
         },
         Key::S => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'S' as u8;
+                CURRENT_KEY = b'S';
             } else {
-                CURRENT_KEY = 's' as u8;
+                CURRENT_KEY = b's';
             }
         },
         Key::T => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'T' as u8;
+                CURRENT_KEY = b'T';
             } else {
-                CURRENT_KEY = 't' as u8;
+                CURRENT_KEY = b't';
             }
         },
         Key::U => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'U' as u8;
+                CURRENT_KEY = b'U';
             } else {
-                CURRENT_KEY = 'u' as u8;
+                CURRENT_KEY = b'u';
             }
         },
         Key::V => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'V' as u8;
+                CURRENT_KEY = b'V';
             } else {
-                CURRENT_KEY = 'v' as u8;
+                CURRENT_KEY = b'v';
             }
         },
         Key::W => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'W' as u8;
+                CURRENT_KEY = b'W';
             } else {
-                CURRENT_KEY = 'w' as u8;
+                CURRENT_KEY = b'w';
             }
         },
         Key::X => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'X' as u8;
+                CURRENT_KEY = b'X';
             } else {
-                CURRENT_KEY = 'x' as u8;
+                CURRENT_KEY = b'x';
             }
         },
         Key::Y => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'Y' as u8;
+                CURRENT_KEY = b'Y';
             } else {
-                CURRENT_KEY = 'y' as u8;
+                CURRENT_KEY = b'y';
             }
         },
         Key::Z => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = 'Z' as u8;
+                CURRENT_KEY = b'Z';
             } else {
-                CURRENT_KEY = 'z' as u8;
+                CURRENT_KEY = b'z';
             }
         },
         Key::Num0 => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = ')' as u8;
+                CURRENT_KEY = b')';
             } else {
-                CURRENT_KEY = '0' as u8;
+                CURRENT_KEY = b'0';
             }
         },
         Key::Num1 => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = '!' as u8;
+                CURRENT_KEY = b'!';
             } else {
-                CURRENT_KEY = '1' as u8;
+                CURRENT_KEY = b'1';
             }
         },
         Key::Num2 => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = '@' as u8;
+                CURRENT_KEY = b'@';
             } else {
-                CURRENT_KEY = '2' as u8;
+                CURRENT_KEY = b'2';
             }
         },
         Key::Num3 => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = '#' as u8;
+                CURRENT_KEY = b'#';
             } else {
-                CURRENT_KEY = '3' as u8;
+                CURRENT_KEY = b'3';
             }
         },
         Key::Num4 => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = '$' as u8;
+                CURRENT_KEY = b'$';
             } else {
-                CURRENT_KEY = '4' as u8;
+                CURRENT_KEY = b'4';
             }
         },
         Key::Num5 => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = '%' as u8;
+                CURRENT_KEY = b'%';
             } else {
-                CURRENT_KEY = '5' as u8;
+                CURRENT_KEY = b'5';
             }
         },
         Key::Num6 => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = '^' as u8;
+                CURRENT_KEY = b'^';
             } else {
-                CURRENT_KEY = '6' as u8;
+                CURRENT_KEY = b'6';
             }
         },
         Key::Num7 => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = '&' as u8;
+                CURRENT_KEY = b'&';
             } else {
-                CURRENT_KEY = '7' as u8;
+                CURRENT_KEY = b'7';
             }
         },
         Key::Num8 => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = '*' as u8;
+                CURRENT_KEY = b'*';
             } else {
-                CURRENT_KEY = '8' as u8;
+                CURRENT_KEY = b'8';
             }
         },
         Key::Num9 => unsafe {
             if input.modifiers.shift {
-                CURRENT_KEY = '(' as u8;
+                CURRENT_KEY = b'(';
             } else {
-                CURRENT_KEY = '9' as u8;
+                CURRENT_KEY = b'9';
             }
         },
         Key::Space => unsafe {
-            CURRENT_KEY = ' ' as u8;
+            CURRENT_KEY = b' ';
         },
         Key::Enter => unsafe {
-            CURRENT_KEY = 128 as u8;
+            CURRENT_KEY = 128_u8;
         },
         Key::Backspace => unsafe {
             CURRENT_KEY = 129;

@@ -29,6 +29,7 @@ tempfile = "3.10.1"
 anyhow = "1.0.86"
 simplelog = "0.12.2"
 web-time = "1.1.0"
+thiserror = "1.0.61"
 
 
 
@@ -52,8 +53,8 @@ opt-level = 2
 [patch.crates-io]
 
 # If you want to use the bleeding edge version of egui and eframe:
-# egui = { git = "https://github.com/emilk/egui", branch = "master" }
-# eframe = { git = "https://github.com/emilk/egui", branch = "master" }
+egui = { git = "https://github.com/emilk/egui", branch = "master" }
+eframe = { git = "https://github.com/emilk/egui", branch = "master" }
 
 # If you fork https://github.com/emilk/egui you can test with:
 # egui = { path = "../egui/crates/egui" }

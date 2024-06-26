@@ -1,8 +1,9 @@
 use crate::StopReason;
 use crate::{hacksys::HackSystem, key_lookup::lookup_key};
-use egui::{vec2, Color32, InputState, Key, Painter, Pos2, Rect, Sense, TextureHandle, Ui, Vec2};
+use egui::{Pos2, Sense, Ui, Vec2};
 
-use web_time::{Duration, Instant};
+use thiserror::Error;
+use web_time::Duration;
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 //#[derive(serde::Deserialize, serde::Serialize)]
 //#[serde(default)] // if we add new fields, give them default values when deserializing old state
@@ -12,15 +13,20 @@ pub struct HackEmulator {
     // #[serde(skip)]
     running: bool,
     //#[serde(skip)]
-    texture: TextureHandle,
-    pixels: Vec<Color32>,
-    draw_count: usize,
-    last_draw_time: Instant,
-    start: Instant,
     elapsed: Duration,
     text: String,
 }
-
+#[derive(Debug, Error, PartialEq)]
+pub enum RuntimeError {
+    #[error("Invalid instruction")]
+    InvalidInstruction,
+    #[error("Invalid RAM read address {0}")]
+    InvalidReadAddress(u16),
+    #[error("Invalid RAM write address {0}")]
+    InvalidWriteAddress(u16),
+    #[error("Invalid instruction address {0}")]
+    InvalidPC(u16),
+}
 const SCREEN_WIDTH: usize = 512;
 const SCREEN_HEIGHT: usize = 256;
 
@@ -29,7 +35,7 @@ const SCREEN_HEIGHT: usize = 256;
 pub(crate) static mut CURRENT_KEY: u8 = 0;
 impl HackEmulator {
     /// Called once before the first frame.
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
 
@@ -39,30 +45,13 @@ impl HackEmulator {
         //     return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
         // }
 
-        let app = Self {
-            texture: cc.egui_ctx.load_texture(
-                "noise",
-                egui::ColorImage::example(),
-                egui::TextureOptions::NEAREST,
-            ),
+        Self {
             hacksys: HackSystem::new(),
             running: false,
-            pixels: vec![egui::Color32::BLACK; SCREEN_WIDTH * SCREEN_HEIGHT],
-            draw_count: 0,
-            last_draw_time: Instant::now(),
-            start: Instant::now(),
             elapsed: Duration::from_secs(0),
             text: String::new(),
-        };
-
-        app
+        }
     }
-
-    // fn draw_pixel(area: &Rect, painter: &Painter, x: i32, y: i32) {
-    //     let rect_points =
-    //         egui::Rect::from_min_size(Pos2::new(x as f32, y as f32), Vec2::splat(1 as f32));
-    //     painter.rect_filled(rect_points, 0.0, egui::Color32::BLACK);
-    // }
 
     fn draw_ram(&mut self, ui: &mut Ui) {
         let screen = self.hacksys.get_screen_ram();
@@ -139,7 +128,7 @@ impl HackEmulator {
 
 impl eframe::App for HackEmulator {
     /// Called by the frame work to save state before shutdown.
-    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+    fn save(&mut self, _storage: &mut dyn eframe::Storage) {
         //  eframe::set_value(storage, eframe::APP_KEY, self);
     }
 
@@ -150,7 +139,7 @@ impl eframe::App for HackEmulator {
         if !ctx.wants_keyboard_input() {
             ctx.input(|inp| {
                 // log::trace!("{:?}", inp);
-                if inp.keys_down.len() > 0 {
+                if !inp.keys_down.is_empty() {
                     println!(
                         "{:?} {:?} {} ",
                         inp.keys_down,
@@ -164,13 +153,13 @@ impl eframe::App for HackEmulator {
                         CURRENT_KEY = 0;
                     }
                 }
-                if let Some(ev) = inp.events.iter().next() {
-                    if let egui::Event::Text(text) = ev {
-                        println!("{:?}", text);
-                        unsafe {
-                            CURRENT_KEY = text.chars().next().unwrap() as u8;
-                        }
+                if let Some(egui::Event::Text(text)) = inp.events.first() {
+                    // if let egui::Event::Text(text) = ev {
+                    println!("Text {:?}", text);
+                    unsafe {
+                        CURRENT_KEY = text.chars().next().unwrap() as u8;
                     }
+                    //}
                 }
             });
         }
@@ -201,12 +190,10 @@ impl eframe::App for HackEmulator {
                 egui::widgets::global_dark_light_mode_buttons(ui);
             });
             if ui.button("Step").clicked() {
-                self.hacksys.execute_instructions(Duration::ZERO);
+                let _ = self.hacksys.execute_instructions(Duration::ZERO);
             }
 
             if ui.button("Run").clicked() {
-                //     self.build_texture();
-
                 self.running = !self.running;
             }
         });
@@ -233,23 +220,30 @@ impl eframe::App for HackEmulator {
             .default_height(500.0)
             .show(ctx, |ui| self.draw_ram(ui));
 
+        // run instructions until we hit a stop condition
+        // - time out after the supliied number of ms draw next screen frame)
+        // - Sys.halt or hard loop detected
+        // - an error occurs
         if self.running {
             let stop = self.hacksys.execute_instructions(Duration::from_millis(50));
             // println!("{:?}", stop);
             match stop {
-                StopReason::SysHalt | StopReason::HardLoop => {
-                    self.running = false;
-                    self.elapsed = Instant::now() - self.start;
-                }
-                StopReason::ScreenUpdate(addr) => {
-                    // self.update_pixels(addr);
+                Ok(reason) => match reason {
+                    StopReason::SysHalt => {
+                        self.running = false;
+                    }
+                    StopReason::HardLoop => {
+                        self.running = false;
+                    }
 
-                    //ctx.request_repaint();
+                    StopReason::RefreshUI => {
+                        ctx.request_repaint();
+                    }
+                },
+                Err(err) => {
+                    self.running = false;
+                    log::error!("Error: {}", err);
                 }
-                StopReason::Count => {
-                    ctx.request_repaint();
-                }
-                _ => {}
             }
         };
     }

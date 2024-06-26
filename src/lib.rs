@@ -7,6 +7,7 @@ mod key_lookup;
 mod wasm;
 use crate::app::CURRENT_KEY;
 pub use app::HackEmulator;
+use app::RuntimeError;
 use web_time::{Duration, Instant};
 mod code_loader;
 use anyhow::{bail, Result};
@@ -19,17 +20,19 @@ pub struct HackEngine {
     pub halt_addr: u16,
     pub speed: f32,
     inst_count: u64,
-    last_count: u64,
 }
 #[derive(Debug, PartialEq)]
 pub(crate) enum StopReason {
-    ScreenUpdate(u16),
-    Count,
-    Error(String),
+    RefreshUI,
     SysHalt,
     HardLoop,
-    None,
 }
+impl Default for HackEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HackEngine {
     pub fn new() -> HackEngine {
         HackEngine {
@@ -41,7 +44,6 @@ impl HackEngine {
             halt_addr: 0,
             speed: 0.0,
             inst_count: 0,
-            last_count: 0,
         }
     }
     fn alu(x_in: u16, y_in: u16, c: u16) -> u16 {
@@ -50,38 +52,31 @@ impl HackEngine {
         let zy = (c >> 3) & 0x1;
         let ny = (c >> 2) & 0x1;
         let f = (c >> 1) & 0x1;
-        let no = (c >> 0) & 0x1;
+        let no = c & 0x1;
 
         let x = if zx != 0 { 0 } else { x_in };
-        //  println!("x: {}", x);
+
         let x = if nx != 0 { !x } else { x };
-        //    println!("x: {}", x);
         let y = if zy != 0 { 0 } else { y_in };
-        //   println!("y: {}", y);
 
         let y = if ny != 0 { !y } else { y };
-        //  println!("y: {}", y);
 
-        let out = if f != 0 {
+        if f != 0 {
             if no != 0 {
                 !u16::wrapping_add(x, y)
             } else {
                 u16::wrapping_add(x, y)
             }
+        } else if no != 0 {
+            !(x & y)
         } else {
-            if no != 0 {
-                !(x & y)
-            } else {
-                x & y
-            }
-        };
-        //  println!("out: {}", out);
-        out
+            x & y
+        }
     }
-    fn set_ram(&mut self, address: u16, value: u16) {
+    fn set_ram(&mut self, address: u16, value: u16) -> Result<()> {
         if address >= 0x8000 {
             println!("Invalid address {:04x} at {:04x}", address, self.pc);
-            //  return StopReason::Error(format!("Invalid address {} at {}", address, self.pc));
+            bail!(RuntimeError::InvalidWriteAddress(address));
         }
 
         match address {
@@ -90,7 +85,7 @@ impl HackEngine {
             }
             0x4000..=0x5fff => {
                 // screen
-                let old = self.ram[address as usize];
+                let _old = self.ram[address as usize];
                 self.ram[address as usize] = value;
             }
             0x6000 => {
@@ -101,31 +96,39 @@ impl HackEngine {
                 self.ram[address as usize] = value;
             }
         }
+        Ok(())
     }
-    fn get_ram(&mut self, address: u16) -> u16 {
+    fn get_ram(&mut self, address: u16) -> Result<u16> {
+        if address >= 0x8000 {
+            println!("Invalid address {:04x} at {:04x}", address, self.pc);
+            bail!(RuntimeError::InvalidReadAddress(address));
+        }
         if address == 0x6000 {
             // keyboard
             // read from keyboard
             unsafe {
                 //  println!("Current key: {}", CURRENT_KEY as u16);
-                return CURRENT_KEY as u16;
+                return Ok(CURRENT_KEY as u16);
             }
         }
-        self.ram[address as usize]
+        Ok(self.ram[address as usize])
     }
-    pub(crate) fn execute_instructions(&mut self, run_time: Duration) -> StopReason {
+    pub(crate) fn execute_instructions(&mut self, run_time: Duration) -> Result<StopReason> {
         let now = Instant::now();
         self.speed = 0.0;
         let mut counter = 0;
         let inst_count_snap = self.inst_count;
         loop {
-            counter = counter + 1;
+            if self.pc >= 0x8000 {
+                bail!(RuntimeError::InvalidPC(self.pc));
+            }
+            counter += 1;
             if counter > 1000 {
                 let time = Instant::now() - now;
                 if time > run_time {
                     self.speed =
                         (self.inst_count - inst_count_snap) as f32 / time.as_secs_f32() / 1000000.0;
-                    return StopReason::Count;
+                    return Ok(StopReason::RefreshUI);
                 }
                 counter = 0;
             }
@@ -133,14 +136,14 @@ impl HackEngine {
 
             let instruction = self.rom[self.pc as usize];
             if self.halt_addr != 0 && self.pc == self.halt_addr + 1 {
-                return StopReason::SysHalt;
+                return Ok(StopReason::SysHalt);
             }
             let opcode = instruction >> 15;
             let a = (instruction >> 12) & 0x1;
             let c = (instruction >> 6) & 0x3F;
             let d = (instruction >> 3) & 0x7;
             let j = instruction & 0x7;
-            self.pc = self.pc + 1;
+            self.pc += 1;
             match opcode {
                 0 => {
                     // A instruction
@@ -162,10 +165,14 @@ impl HackEngine {
                     //     self.d,
                     //     m
                     // )
-                    let y = if a == 0 { self.a } else { self.get_ram(self.a) };
+                    let y = if a == 0 {
+                        self.a
+                    } else {
+                        self.get_ram(self.a)?
+                    };
                     let alu_out = Self::alu(self.d, y, c);
                     if d & 0x1 != 0 {
-                        self.set_ram(self.a, alu_out);
+                        self.set_ram(self.a, alu_out)?;
                     }
                     if d & 0x2 != 0 {
                         self.d = alu_out;
@@ -175,32 +182,26 @@ impl HackEngine {
                     }
                     let pc = self.pc;
 
-                    if j & 0x1 != 0 {
-                        if (alu_out as i16) > 0 {
-                            self.pc = self.a;
-                        }
+                    if j & 0x1 != 0 && (alu_out as i16) > 0 {
+                        self.pc = self.a;
                     }
-                    if j & 0x2 != 0 {
-                        if alu_out == 0 {
-                            self.pc = self.a;
-                        }
+                    if j & 0x2 != 0 && alu_out == 0 {
+                        self.pc = self.a;
                     }
-                    if j & 0x4 != 0 {
-                        if (alu_out as i16) < 0 {
-                            self.pc = self.a;
-                        }
+                    if j & 0x4 != 0 && (alu_out as i16) < 0 {
+                        self.pc = self.a;
                     }
                     // detects halt loop
                     if pc > 2 && self.pc == pc - 2 {
-                        return StopReason::HardLoop;
+                        return Ok(StopReason::HardLoop);
                     }
                 }
                 _ => {
-                    return StopReason::Error("Invalid opcode".to_string());
+                    bail!(RuntimeError::InvalidInstruction);
                 }
             }
             if run_time == Duration::ZERO {
-                return StopReason::Count;
+                return Ok(StopReason::RefreshUI);
             }
         }
     }
@@ -300,46 +301,14 @@ mod tests {
         cpu.rom[11] = 0x8307;
 
         loop {
-            if cpu.execute_instruction() {
+            if cpu.execute_instructions(Duration::ZERO).unwrap() == StopReason::HardLoop {
                 break;
             }
         }
         assert!(cpu.ram[17] == 2);
         assert!(cpu.ram[16] == 3);
     }
-    #[test]
-    fn read_intercept() {
-        let mut v1 = 0u16;
-        let v2 = 42u16;
-        {
-            let mut cpu = HackEngine::new();
 
-            // cpu.set_io(
-            //     5000,
-            //     5000,
-            //     |_a, v| {
-            //         println!("v: {}", v);
-            //         v1 = v
-            //     },
-            //     |_address| v2,
-            // );
-
-            cpu.rom[0] = 0x0002;
-            cpu.rom[1] = 0x8c10;
-            cpu.rom[2] = 5000;
-            cpu.rom[3] = 0x8308;
-            cpu.rom[4] = 0x000a;
-            cpu.rom[5] = 0x8304;
-            cpu.rom[6] = 0x0003;
-            cpu.rom[7] = 0x8c10;
-            cpu.rom[8] = 0x0010;
-            cpu.rom[9] = 0x8308;
-            cpu.rom[10] = 0x000a;
-            cpu.rom[11] = 0x8307;
-            // cpu.run();
-        }
-        //assert_eq!(v1, 2);
-    }
     #[test]
     fn test_jumps_1_gt() {
         let mut cpu = HackEngine::new();
@@ -363,7 +332,7 @@ mod tests {
         cpu.rom[5] = 0x0005;
         cpu.rom[6] = 0xe307;
         loop {
-            if cpu.execute_instruction() {
+            if cpu.execute_instructions(Duration::ZERO).unwrap() == StopReason::HardLoop {
                 break;
             }
         }
@@ -388,7 +357,7 @@ mod tests {
         cpu.rom[5] = 0x0005;
         cpu.rom[6] = 0xe307;
         loop {
-            if cpu.execute_instruction() {
+            if cpu.execute_instructions(Duration::ZERO).unwrap() == StopReason::HardLoop {
                 break;
             }
         }
@@ -413,7 +382,7 @@ mod tests {
         cpu.rom[5] = 0x0005;
         cpu.rom[6] = 0xe307;
         loop {
-            if cpu.execute_instruction() {
+            if cpu.execute_instructions(Duration::ZERO).unwrap() == StopReason::HardLoop {
                 break;
             }
         }
@@ -438,7 +407,7 @@ mod tests {
         cpu.rom[5] = 0x0005;
         cpu.rom[6] = 0xe307;
         loop {
-            if cpu.execute_instruction() {
+            if cpu.execute_instructions(Duration::ZERO).unwrap() == StopReason::HardLoop {
                 break;
             }
         }
@@ -463,7 +432,7 @@ mod tests {
         cpu.rom[5] = 0x0005;
         cpu.rom[6] = 0xe307;
         loop {
-            if cpu.execute_instruction() {
+            if cpu.execute_instructions(Duration::ZERO).unwrap() == StopReason::HardLoop {
                 break;
             }
         }
@@ -488,7 +457,7 @@ mod tests {
         cpu.rom[5] = 0x0005;
         cpu.rom[6] = 0xe307;
         loop {
-            if cpu.execute_instruction() {
+            if cpu.execute_instructions(Duration::ZERO).unwrap() == StopReason::HardLoop {
                 break;
             }
         }
@@ -513,7 +482,7 @@ mod tests {
         cpu.rom[5] = 0x0005;
         cpu.rom[6] = 0xe307;
         loop {
-            if cpu.execute_instruction() {
+            if cpu.execute_instructions(Duration::ZERO).unwrap() == StopReason::HardLoop {
                 break;
             }
         }
@@ -538,7 +507,7 @@ mod tests {
         cpu.rom[5] = 0x0005;
         cpu.rom[6] = 0xe307;
         loop {
-            if cpu.execute_instruction() {
+            if cpu.execute_instructions(Duration::ZERO).unwrap() == StopReason::HardLoop {
                 break;
             }
         }
@@ -563,7 +532,7 @@ mod tests {
         cpu.rom[5] = 0x0005;
         cpu.rom[6] = 0xe307;
         loop {
-            if cpu.execute_instruction() {
+            if cpu.execute_instructions(Duration::ZERO).unwrap() == StopReason::HardLoop {
                 break;
             }
         }
@@ -588,7 +557,7 @@ mod tests {
         cpu.rom[5] = 0x0005;
         cpu.rom[6] = 0xe307;
         loop {
-            if cpu.execute_instruction() {
+            if cpu.execute_instructions(Duration::ZERO).unwrap() == StopReason::HardLoop {
                 break;
             }
         }
@@ -613,7 +582,7 @@ mod tests {
         cpu.rom[5] = 0x0005;
         cpu.rom[6] = 0xe307;
         loop {
-            if cpu.execute_instruction() {
+            if cpu.execute_instructions(Duration::ZERO).unwrap() == StopReason::HardLoop {
                 break;
             }
         }
@@ -638,7 +607,7 @@ mod tests {
         cpu.rom[5] = 0x0005;
         cpu.rom[6] = 0xe307;
         loop {
-            if cpu.execute_instruction() {
+            if cpu.execute_instructions(Duration::ZERO).unwrap() == StopReason::HardLoop {
                 break;
             }
         }
@@ -663,7 +632,7 @@ mod tests {
         cpu.rom[5] = 0x0005;
         cpu.rom[6] = 0xe307;
         loop {
-            if cpu.execute_instruction() {
+            if cpu.execute_instructions(Duration::ZERO).unwrap() == StopReason::HardLoop {
                 break;
             }
         }
@@ -688,7 +657,7 @@ mod tests {
         cpu.rom[5] = 0x0005;
         cpu.rom[6] = 0xe307;
         loop {
-            if cpu.execute_instruction() {
+            if cpu.execute_instructions(Duration::ZERO).unwrap() == StopReason::HardLoop {
                 break;
             }
         }
@@ -713,7 +682,7 @@ mod tests {
         cpu.rom[5] = 0x0005;
         cpu.rom[6] = 0xe307;
         loop {
-            if cpu.execute_instruction() {
+            if cpu.execute_instructions(Duration::ZERO).unwrap() == StopReason::HardLoop {
                 break;
             }
         }
@@ -738,7 +707,7 @@ mod tests {
         cpu.rom[5] = 0x0005;
         cpu.rom[6] = 0xe307;
         loop {
-            if cpu.execute_instruction() {
+            if cpu.execute_instructions(Duration::ZERO).unwrap() == StopReason::HardLoop {
                 break;
             }
         }
@@ -763,7 +732,7 @@ mod tests {
         cpu.rom[5] = 0x0005;
         cpu.rom[6] = 0xe307;
         loop {
-            if cpu.execute_instruction() {
+            if cpu.execute_instructions(Duration::ZERO).unwrap() == StopReason::HardLoop {
                 break;
             }
         }
@@ -788,7 +757,7 @@ mod tests {
         cpu.rom[5] = 0x0005;
         cpu.rom[6] = 0xe307;
         loop {
-            if cpu.execute_instruction() {
+            if cpu.execute_instructions(Duration::ZERO).unwrap() == StopReason::HardLoop {
                 break;
             }
         }
@@ -813,7 +782,7 @@ mod tests {
         cpu.rom[5] = 0x0005;
         cpu.rom[6] = 0xe307;
         loop {
-            if cpu.execute_instruction() {
+            if cpu.execute_instructions(Duration::ZERO).unwrap() == StopReason::HardLoop {
                 break;
             }
         }
@@ -838,7 +807,7 @@ mod tests {
         cpu.rom[5] = 0x0005;
         cpu.rom[6] = 0xe307;
         loop {
-            if cpu.execute_instruction() {
+            if cpu.execute_instructions(Duration::ZERO).unwrap() == StopReason::HardLoop {
                 break;
             }
         }
@@ -863,7 +832,7 @@ mod tests {
         cpu.rom[5] = 0x0005;
         cpu.rom[6] = 0xe307;
         loop {
-            if cpu.execute_instruction() {
+            if cpu.execute_instructions(Duration::ZERO).unwrap() == StopReason::HardLoop {
                 break;
             }
         }

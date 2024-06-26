@@ -1,15 +1,13 @@
 use crate::HackEngine;
-use std::io::{self, Write};
-use tempfile::tempfile;
+
 enum LoadTarget {
-    RAM,
-    ROM,
+    Ram,
+    Rom,
     None,
 }
 
 impl HackEngine {
     pub fn load_file(&mut self, bin: &str) {
-      
         let mut address = 0;
         // peek at first line
         if bin.starts_with("hackem") {
@@ -35,17 +33,17 @@ impl HackEngine {
                 if line.starts_with("//") {
                     continue;
                 }
-                if line.starts_with("RAM@") {
-                    address = u16::from_str_radix(&line[4..], 16).unwrap();
-                    target = LoadTarget::RAM;
-                } else if line.starts_with("ROM@") {
-                    address = u16::from_str_radix(&&line[4..], 16).unwrap();
-                    target = LoadTarget::ROM;
+                if let Some(stripped) = line.strip_prefix("RAM@") {
+                    address = u16::from_str_radix(stripped, 16).unwrap();
+                    target = LoadTarget::Ram;
+                } else if let Some(stripped) = line.strip_prefix("ROM@") {
+                    address = u16::from_str_radix(stripped, 16).unwrap();
+                    target = LoadTarget::Rom;
                 } else {
                     let value = u16::from_str_radix(line, 16).unwrap();
                     match target {
-                        LoadTarget::RAM => self.ram[address as usize] = value,
-                        LoadTarget::ROM => self.rom[address as usize] = value,
+                        LoadTarget::Ram => self.ram[address as usize] = value,
+                        LoadTarget::Rom => self.rom[address as usize] = value,
                         LoadTarget::None => panic!("No target specified"),
                     }
                     address += 1;
@@ -67,13 +65,14 @@ impl HackEngine {
         }
     }
 }
+#[cfg(test)]
 mod tests {
-    use tempfile::NamedTempFile;
 
-    use super::*;
+    use crate::HackEngine;
+
     #[test]
     fn test_load_file() {
-        let binfile = r#"hackem v1.0
+        let binfile = r#"hackem v1.0 0x0000
 ROM@0000
 0002
 8c10
@@ -94,11 +93,8 @@ RAM@3333
 abcd
 ffff"#;
 
-        let mut file = NamedTempFile::new().unwrap();
-
-        file.write_all(binfile.as_bytes()).unwrap();
         let mut hack = HackEngine::new();
-        hack.load_file(file.path().to_str().unwrap());
+        hack.load_file(binfile);
 
         assert_eq!(hack.rom[0], 0x0002);
         assert_eq!(hack.rom[1], 0x8c10);
