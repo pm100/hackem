@@ -38,12 +38,13 @@ impl ConsoleWindow {
                 .id(Id::new("console_text"))
                 .show(ui);
 
-            let cursor = widget.state.cursor.char_range().unwrap();
-            let last_off = self.text.rfind('\n').unwrap_or(0);
-            if cursor.primary.index < last_off {
-                self.new_line = true;
+            if let Some(cursor) = widget.state.cursor.char_range() {
+                let last_off = self.text.rfind('\n').unwrap_or(0);
+                if cursor.primary.index < last_off {
+                    self.new_line = true;
+                }
             }
-            println!("Cursor: {:?}", cursor);
+            //println!("Cursor: {:?}", cursor);
             let text_edit_id = widget.response.id;
             if self.new_line {
                 if let Some(mut state) = egui::TextEdit::load_state(ui.ctx(), text_edit_id) {
