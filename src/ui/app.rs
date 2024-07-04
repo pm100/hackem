@@ -1,9 +1,14 @@
-use crate::StopReason;
-use crate::{hacksys::HackSystem, key_lookup::lookup_key};
-use egui::{Pos2, Sense, Ui, Vec2};
+use crate::{
+    emulator::{hacksys::HackSystem, lib::StopReason},
+    ui::key_lookup::lookup_key,
+};
+
+use egui::{Id, Key, Modifiers, Pos2, Sense, Ui, Vec2};
 
 use thiserror::Error;
 use web_time::Duration;
+
+use super::widgets::console::ConsoleWindow;
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 //#[derive(serde::Deserialize, serde::Serialize)]
 //#[serde(default)] // if we add new fields, give them default values when deserializing old state
@@ -15,6 +20,8 @@ pub struct HackEmulator {
     //#[serde(skip)]
     elapsed: Duration,
     text: String,
+    console: String,
+    windows: Vec<Box<dyn MyWidget>>,
 }
 #[derive(Debug, Error, PartialEq)]
 pub enum RuntimeError {
@@ -29,13 +36,36 @@ pub enum RuntimeError {
 }
 const SCREEN_WIDTH: usize = 512;
 const SCREEN_HEIGHT: usize = 256;
-
+pub enum AppMessage {
+    LoadBinary(String),
+    ConsoleCommand(String),
+    Quit,
+    None,
+}
+pub struct UpdateMessage {
+    pub message: UpdateType,
+    pub widget: Id,
+}
+pub enum UpdateType {
+    Text(String),
+}
+pub trait MyWidget {
+    fn draw(&mut self, ctx: &egui::Context, open: &mut bool);
+    fn update(&mut self, msg: UpdateMessage) {}
+    fn name(&self) -> &'static str;
+    fn keyboard_peek(&mut self, ctx: &egui::Context) -> Option<AppMessage> {
+        None
+    }
+    fn id(&self) -> Id {
+        Id::new(self.name())
+    }
+}
 // ascii value of current key
 
 pub(crate) static mut CURRENT_KEY: u8 = 0;
 impl HackEmulator {
     /// Called once before the first frame.
-    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
 
@@ -50,6 +80,8 @@ impl HackEmulator {
             running: false,
             elapsed: Duration::from_secs(0),
             text: String::new(),
+            console: String::new(),
+            windows: vec![Box::new(ConsoleWindow::new())],
         }
     }
 
@@ -134,8 +166,11 @@ impl eframe::App for HackEmulator {
 
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui_extras::install_image_loaders(ctx);
         // Put your widgets into a `SidePanel`, `TopBottomPanel`, `CentralPanel`, `Window` or `Area`.
         // For inspiration and more examples, go to https://emilk.github.io/egui
+        let mut open = true;
+        let mut app_msg = AppMessage::None;
         if !ctx.wants_keyboard_input() {
             ctx.input(|inp| {
                 // log::trace!("{:?}", inp);
@@ -162,7 +197,48 @@ impl eframe::App for HackEmulator {
                     //}
                 }
             });
+        } else {
+            if let Some(id) = ctx.memory(|mem| mem.focused()) {
+                // println!(
+                //     "Focused: {:?} {:?}",
+                //     id,
+                //     Id::new("Console Window".to_string())
+                // );
+                for window in self.windows.iter_mut() {
+                    if id == window.id() {
+                        if let Some(msg) = window.keyboard_peek(ctx) {
+                            app_msg = msg;
+                        }
+                        break;
+                    }
+                }
+                // if id == Id::new("Console Window".to_string()) {
+                //     if ctx.input_mut(|inp| inp.consume_key(Modifiers::NONE, Key::ArrowDown)) {
+                //         println!("Console focus: down");
+                //     }
+                //     if ctx.input_mut(|inp| inp.consume_key(Modifiers::NONE, Key::ArrowUp)) {
+                //         println!("Console focus: Up");
+                //     }
+                // }
+            }
         }
+        match app_msg {
+            AppMessage::LoadBinary(bin) => {
+                self.hacksys.load_file(&bin);
+            }
+            AppMessage::ConsoleCommand(cmd) => {
+                let id = self.windows[0].id();
+                self.windows[0].update(UpdateMessage {
+                    message: UpdateType::Text(cmd),
+                    widget: id,
+                });
+            }
+            AppMessage::Quit => {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+            AppMessage::None => {}
+        }
+        self.windows[0].draw(ctx, &mut open);
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
 
@@ -197,6 +273,22 @@ impl eframe::App for HackEmulator {
                 self.running = !self.running;
             }
         });
+        // egui::Window::new("console")
+        //     .default_height(500.0)
+        //     .show(ctx, |ui| {
+        //         egui::ScrollArea::vertical().show(ui, |ui| {
+        //             ui.add(
+        //                 egui::TextEdit::multiline(&mut self.console)
+        //                     .id(Id::new("consolexx".to_string()))
+        //                     .font(egui::TextStyle::Monospace) // for cursor height
+        //                     .code_editor()
+        //                     .desired_rows(10)
+        //                     .lock_focus(true)
+        //                     .desired_width(f32::INFINITY),
+        //                 // .layouter(&mut layouter),
+        //             );
+        //         });
+        //     });
 
         egui::Window::new("screen")
             .default_height(500.0)
@@ -212,6 +304,13 @@ impl eframe::App for HackEmulator {
                     egui::TextEdit::singleline(&mut self.text).hint_text("Write something here"),
                 );
                 ui.end_row();
+                let egui_icon = egui::include_image!("../../data/fast-forward.svg");
+                if ui
+                    .add(egui::Button::image_and_text(egui_icon, "Run"))
+                    .clicked()
+                {
+                    //*boolean = !*boolean;
+                }
             });
         egui::Window::new("CPU")
             .default_height(500.0)

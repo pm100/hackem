@@ -1,16 +1,8 @@
 #![warn(clippy::all, rust_2018_idioms)]
 
-mod app;
-mod hacksys;
-mod key_lookup;
-#[cfg(target_arch = "wasm32")]
-mod wasm;
-use crate::app::CURRENT_KEY;
-pub use app::HackEmulator;
-use app::RuntimeError;
-use web_time::{Duration, Instant};
-mod code_loader;
+use crate::ui::app::{RuntimeError, CURRENT_KEY};
 use anyhow::{bail, Result};
+use web_time::{Duration, Instant};
 pub struct HackEngine {
     pub pc: u16,
     pub a: u16,

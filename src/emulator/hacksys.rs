@@ -1,8 +1,6 @@
-
-
 use web_time::Duration;
 
-use crate::{HackEngine, StopReason};
+use super::lib::{HackEngine, StopReason};
 
 pub struct HackSystem {
     pub engine: HackEngine,

@@ -1,6 +1,26 @@
 #![warn(clippy::all, rust_2018_idioms)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
-use hackem::HackEmulator;
+mod ui {
+    pub mod widgets {
+        pub mod console;
+    }
+    pub mod app;
+    mod key_lookup;
+    #[cfg(target_arch = "wasm32")]
+    pub mod wasm;
+}
+mod emulator {
+    mod code_loader;
+
+    pub mod hacksys;
+    pub mod lib;
+}
+
+use crate::ui::app::CURRENT_KEY;
+pub use ui::app::HackEmulator;
+use ui::app::RuntimeError;
+use web_time::{Duration, Instant};
+
 use simplelog::*;
 use std::fs::File;
 
@@ -28,7 +48,8 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "Hack Emulator",
         native_options,
-        Box::new(|cc| Ok(Box::new(HackEmulator::new(cc)))),
+        //        Box::new(|cc| Ok(Box::new(HackEmulator::new(cc)))),
+        Box::new(|cc| Box::new(HackEmulator::new(cc))),
     )
 }
 

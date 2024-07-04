@@ -1,4 +1,4 @@
-use crate::HackEngine;
+use super::lib::HackEngine;
 
 enum LoadTarget {
     Ram,
@@ -68,7 +68,7 @@ impl HackEngine {
 #[cfg(test)]
 mod tests {
 
-    use crate::HackEngine;
+    use crate::emulator::lib::HackEngine;
 
     #[test]
     fn test_load_file() {
