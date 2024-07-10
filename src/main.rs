@@ -1,25 +1,40 @@
 #![warn(clippy::all, rust_2018_idioms)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
+
+mod utils;
+
+// the egui ui
 mod ui {
     pub mod widgets {
         pub mod console;
+        pub mod cpu;
+        pub mod files;
+        pub mod screen;
     }
     pub mod app;
     mod key_lookup;
     #[cfg(target_arch = "wasm32")]
     pub mod wasm;
 }
+
+// the hack cpu + ram / rom emulator
 mod emulator {
     mod code_loader;
-
-    pub mod hacksys;
-    pub mod lib;
+    pub mod engine;
 }
 
-use crate::ui::app::CURRENT_KEY;
-pub use ui::app::HackEmulator;
-use ui::app::RuntimeError;
-use web_time::{Duration, Instant};
+// the main application
+mod debugger {
+    pub mod debug_em;
+    pub mod expr;
+    pub mod pdbio;
+    pub mod shell;
+    pub mod syntax;
+}
+
+pub use ui::app::HackEgui;
+
+
 
 use simplelog::*;
 use std::fs::File;
@@ -48,8 +63,8 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "Hack Emulator",
         native_options,
-        //        Box::new(|cc| Ok(Box::new(HackEmulator::new(cc)))),
-        Box::new(|cc| Box::new(HackEmulator::new(cc))),
+        Box::new(|cc| Ok(Box::new(HackEgui::new(cc)))),
+        // Box::new(|cc| Box::new(HackEmulator::new(cc))),
     )
 }
 
@@ -66,7 +81,7 @@ fn main() {
             .start(
                 "the_canvas_id", // hardcode it
                 web_options,
-                Box::new(|cc| Box::new(HackEmulator::new(cc))),
+                Box::new(|cc| Box::new(HackEgui::new(cc))),
             )
             .await
             .expect("failed to start eframe");

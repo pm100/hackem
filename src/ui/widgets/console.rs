@@ -1,6 +1,9 @@
-use egui::{debug_text::print, Id, Key, Modifiers};
+use egui::{Align, Context, Event, Id, Key, Modifiers, Ui};
 
-use crate::ui::app::{AppMessage, MyWidget, UpdateMessage, UpdateType};
+use crate::{
+    debugger::debug_em::HackSystem,
+    ui::app::{AppMessage, AppWindow, UpdateType},
+};
 
 pub(crate) struct ConsoleWindow {
     text: String,
@@ -8,6 +11,8 @@ pub(crate) struct ConsoleWindow {
     command_history: Vec<String>,
     history_cursor: usize,
     prompt: bool,
+    // last_cursor: usize,
+    force_cursor: Option<usize>,
 }
 
 impl ConsoleWindow {
@@ -18,6 +23,8 @@ impl ConsoleWindow {
             command_history: Vec::new(),
             history_cursor: usize::MAX,
             prompt: false,
+            //  last_cursor: usize::MAX,
+            force_cursor: None,
         }
     }
     pub fn prompt(&mut self) {
@@ -28,54 +35,96 @@ impl ConsoleWindow {
         // ui.label("Console");
         //  ui.separator();
         egui::ScrollArea::vertical().show(ui, |ui| {
-            let widget = egui::TextEdit::multiline(&mut self.text)
-                .font(egui::TextStyle::Monospace) // for cursor height
-                .code_editor()
-                .desired_rows(10)
-                .lock_focus(true)
-                .desired_width(f32::INFINITY)
-                //.cursor_at_end(self.new_line)
-                .id(Id::new("console_text"))
-                .show(ui);
+            ui.add_sized(ui.available_size(), |ui: &mut Ui| {
+                let widget = egui::TextEdit::multiline(&mut self.text)
+                    .font(egui::TextStyle::Monospace) // for cursor height
+                    .code_editor()
+                    // .desired_rows(10)
+                    .lock_focus(true)
+                    .desired_width(f32::INFINITY)
+                    //.cursor_at_end(self.new_line)
+                    .id(Id::new("console_text"));
+                let output = widget.show(ui);
+                let mut new_cursor = None;
+                // self.last_cursor = usize::MAX;
+                if let Some(cursor) = output.state.cursor.char_range() {
+                    let last_off = self.text.rfind('\n').unwrap_or(0);
+                    // println!("last_off: {:?} cursor {}", last_off, cursor.primary.index);
+                    //  self.last_cursor = cursor.primary.index;
+                    if cursor.primary.index < last_off {
+                        new_cursor = Some(egui::text::CCursorRange::one(egui::text::CCursor::new(
+                            self.text.char_indices().count(),
+                        )));
+                    }
+                }
 
-            if let Some(cursor) = widget.state.cursor.char_range() {
-                let last_off = self.text.rfind('\n').unwrap_or(0);
-                if cursor.primary.index < last_off {
-                    self.new_line = true;
+                //println!("Cursor: {:?}", cursor);
+                let text_edit_id = output.response.id;
+                if self.new_line {
+                    new_cursor = Some(egui::text::CCursorRange::one(egui::text::CCursor::new(
+                        self.text.char_indices().count(),
+                    )));
+                    self.new_line = false;
                 }
-            }
-            //println!("Cursor: {:?}", cursor);
-            let text_edit_id = widget.response.id;
-            if self.new_line {
-                if let Some(mut state) = egui::TextEdit::load_state(ui.ctx(), text_edit_id) {
-                    let ccursor = egui::text::CCursor::new(self.text.char_indices().count());
-                    state
-                        .cursor
-                        .set_char_range(Some(egui::text::CCursorRange::one(ccursor)));
-                    state.store(ui.ctx(), text_edit_id);
-                    //   ui.ctx().memory_mut(|mem| mem.request_focus(text_edit_id)); // give focus back to the [`TextEdit`].
+                if new_cursor.is_some() {
+                    if let Some(mut state) = egui::TextEdit::load_state(ui.ctx(), text_edit_id) {
+                        println!("set cursor: {:?}", new_cursor);
+                        state.cursor.set_char_range(new_cursor);
+                        //   self.last_cursor = new_cursor.unwrap().primary.index;
+                        state.store(ui.ctx(), text_edit_id);
+                        //   ui.ctx().memory_mut(|mem| mem.request_focus(text_edit_id)); // give focus back to the [`TextEdit`].
+                    }
+                    ui.scroll_to_cursor(Some(Align::BOTTOM));
                 }
-                // self.delta = 0;
-                self.new_line = false;
+                output.response
+            });
+            // self.delta = 0;
+            //self.new_line = false;
+        });
+    }
+    pub fn count_and_not_consume_key(
+        ctx: &Context,
+        modifiers: Modifiers,
+        logical_key: Key,
+    ) -> usize {
+        let mut count = 0usize;
+        ctx.input(|input| {
+            for event in &input.events {
+                let is_match = matches!(
+                    event,
+                    Event::Key {
+                        key: ev_key,
+                        modifiers: ev_mods,
+                        pressed: true,
+                        ..
+                    } if *ev_key == logical_key && ev_mods.matches_logically(modifiers)
+                );
+
+                count += is_match as usize;
             }
         });
+        count
+    }
+    fn consume_key(ctx: &Context, modifiers: Modifiers, logical_key: Key) {
+        ctx.input_mut(|inp| inp.consume_key(modifiers, logical_key));
     }
 }
 
-impl MyWidget for ConsoleWindow {
-    fn draw(&mut self, ctx: &egui::Context, open: &mut bool) {
+impl AppWindow for ConsoleWindow {
+    fn draw(&mut self, ctx: &egui::Context, open: &mut bool, _hacksys: &HackSystem) {
         egui::Window::new(self.name())
             .id(Id::new(self.name()))
             .open(open)
-            .default_height(500.0)
+            .vscroll(false)
+            .default_height(50.0)
             .show(ctx, |ui| {
                 self.ui(ui);
             });
     }
-    fn update(&mut self, msg: crate::ui::app::UpdateMessage) {
+    fn update(&mut self, msg: crate::ui::app::UpdateMessage, _hacksys: &HackSystem) {
         match msg.message {
             UpdateType::Text(output) => {
-                self.text.push_str("\n");
+                self.text.push('\n');
                 self.text.push_str(output.as_str());
                 self.text.push_str("\n>> ");
                 self.new_line = true;
@@ -86,27 +135,33 @@ impl MyWidget for ConsoleWindow {
     fn name(&self) -> &'static str {
         "Console Window"
     }
-    fn keyboard_peek(&mut self, ctx: &egui::Context) -> Option<AppMessage> {
-        //  println!("Console focus: peek");
 
-        let key_list = vec![
-            (Modifiers::NONE, Key::ArrowDown),
+    fn keyboard_peek(&mut self, ctx: &egui::Context, _hacksys: &HackSystem) -> Option<AppMessage> {
+        //  println!("Console focus: peek");
+        let cursor =
+            if let Some(state) = egui::TextEdit::load_state(ctx, Id::new("console_text")) {
+                println!("got state {:?}", state.cursor.char_range());
+                state.cursor.char_range().unwrap().primary.index
+            } else {
+                0
+            };
+        let key_list = [(Modifiers::NONE, Key::ArrowDown),
             (Modifiers::NONE, Key::ArrowUp),
             (Modifiers::NONE, Key::Enter),
-        ];
+            (Modifiers::NONE, Key::ArrowLeft),
+            (Modifiers::NONE, Key::Backspace)];
         let mut matched_key = usize::MAX;
-        ctx.input_mut(|inp| {
-            for (idx, key) in key_list.iter().enumerate() {
-                if inp.consume_key(key.0, key.1) {
-                    matched_key = idx;
-                    break;
-                }
+        for (idx, key) in key_list.iter().enumerate() {
+            if Self::count_and_not_consume_key(ctx, key.0, key.1) > 0 {
+                matched_key = idx;
+                break;
             }
-        });
+        }
+
         if matched_key != usize::MAX {
             // println!("Console focus: key: {:?}", key_list[matched_key]);
-
-            match key_list[matched_key] {
+            let mut eatit = false;
+            let return_value = match key_list[matched_key] {
                 (Modifiers::NONE, Key::ArrowDown) => {
                     //self.delta = 1;
                     let lines = self.text.lines();
@@ -118,7 +173,8 @@ impl MyWidget for ConsoleWindow {
                     }
                     self.text
                         .push_str(self.command_history[self.history_cursor].as_str());
-                    return None;
+                    eatit = true;
+                    None
                 }
                 (Modifiers::NONE, Key::ArrowUp) => {
                     println!("Console focus: ArrowUp");
@@ -133,8 +189,8 @@ impl MyWidget for ConsoleWindow {
                     //  self.text.push_str("\n>> ");
                     self.text
                         .push_str(self.command_history[self.history_cursor].as_str());
-
-                    return None;
+                    eatit = true;
+                    None
                 }
                 (Modifiers::NONE, Key::Enter) => {
                     println!("Console focus: Enter");
@@ -150,10 +206,31 @@ impl MyWidget for ConsoleWindow {
                     self.history_cursor = self.command_history.len() - 1;
                     // self.text.push_str("\n>> ");
                     self.new_line = true;
-                    return Some(AppMessage::ConsoleCommand(last));
+                    eatit = true;
+                    Some(AppMessage::ConsoleCommand(last))
                 }
-                _ => {}
+                (Modifiers::NONE, Key::ArrowLeft) | (Modifiers::NONE, Key::Backspace) => {
+                    let last_off = self.text.rfind('\n').unwrap_or(usize::MAX);
+                    let last_off = if last_off == usize::MAX {
+                        -1
+                    } else {
+                        last_off as isize
+                    };
+                    println!("last_off: {:?} cursor {}", last_off, cursor);
+                    if cursor < (last_off + 5) as usize {
+                        //   self.force_cursor = Some(last_off + 4);
+                        eatit = true;
+                    }
+
+                    None
+                }
+                _ => None,
+            };
+            if eatit {
+                let key = key_list[matched_key];
+                Self::consume_key(ctx, key.0, key.1);
             }
+            return return_value;
         };
         None
     }

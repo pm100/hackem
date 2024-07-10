@@ -1,4 +1,7 @@
-use super::lib::HackEngine;
+use crate::{say, utils};
+
+use super::engine::HackEngine;
+use anyhow::Result;
 
 enum LoadTarget {
     Ram,
@@ -7,9 +10,9 @@ enum LoadTarget {
 }
 
 impl HackEngine {
-    pub fn load_file(&mut self, bin: &str) {
-        let mut address = 0;
+    pub fn load_file(&mut self, bin: &str) -> Result<()> {
         // peek at first line
+        let mut address = 0;
         if bin.starts_with("hackem") {
             let mut target = LoadTarget::None;
             for line in bin.lines() {
@@ -63,12 +66,14 @@ impl HackEngine {
                 address += 1;
             }
         }
+        say!("Loaded file");
+        Ok(())
     }
 }
 #[cfg(test)]
 mod tests {
 
-    use crate::emulator::lib::HackEngine;
+    use crate::emulator::engine::HackEngine;
 
     #[test]
     fn test_load_file() {
