@@ -34,9 +34,9 @@ impl Context for HackSystem {
     fn get_value(&self, key: &str) -> Option<&Value> {
         let regs = self.engine.get_registers();
         let val = match key {
-            ".a" => regs.0 as i64,
-            ".d" => regs.1 as i64,
-            ".pc" => regs.2 as i64,
+            ".pc" => regs.0 as i64,
+            ".a" => regs.1 as i64,
+            ".d" => regs.2 as i64,
             _ => {
                 let sym = self.convert_addr(key).ok();
                 if let Some(s) = sym {
@@ -91,7 +91,7 @@ impl Context for HackSystem {
     }
 }
 impl HackSystem {
-    pub fn evaluate(&mut self, expr: &str) -> Result<u16> {
+    pub fn evaluate(&self, expr: &str) -> Result<u16> {
         eval_int_with_context(expr, self)
             .map_err(|e| anyhow!(e))
             .map(|v| v as u16)

@@ -1,6 +1,6 @@
 use egui::Id;
 
-use crate::{debugger::debug_em::HackSystem, ui::app::AppWindow};
+use crate::{debugger::debug_em::HackSystem, ui::app::AppMessage};
 
 pub struct CpuWindow {}
 
@@ -35,14 +35,17 @@ impl CpuWindow {
             ui.end_row();
         });
     }
-}
 
-impl AppWindow for CpuWindow {
-    fn name(&self) -> &'static str {
+    pub fn name(&self) -> &'static str {
         "Cpu"
     }
 
-    fn draw(&mut self, ctx: &egui::Context, open: &mut bool, hacksys: &HackSystem) {
+    pub fn draw(
+        &mut self,
+        ctx: &egui::Context,
+        open: &mut bool,
+        hacksys: &HackSystem,
+    ) -> Option<AppMessage> {
         egui::Window::new(self.name())
             .id(Id::new(self.name()))
             .open(open)
@@ -50,5 +53,6 @@ impl AppWindow for CpuWindow {
             .show(ctx, |ui| {
                 self.ui(ui, hacksys);
             });
+        None
     }
 }

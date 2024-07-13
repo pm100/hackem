@@ -8,7 +8,7 @@ use anyhow::{bail, Result};
 
 pub struct HackSystem {
     pub engine: HackEngine,
-    pub shell: Shell,
+    // pub shell: Shell,
     pub pdb: Pdb,
     pub(crate) expr_value: RefCell<evalexpr::Value>,
 }
@@ -22,7 +22,7 @@ impl HackSystem {
     pub fn new() -> HackSystem {
         HackSystem {
             engine: HackEngine::new(),
-            shell: Shell::new(),
+            //  shell: Shell::new(),
             pdb: Pdb::new(),
             expr_value: RefCell::new(evalexpr::Value::Int(0)),
         }

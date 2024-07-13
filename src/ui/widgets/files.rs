@@ -8,7 +8,7 @@ use egui_dock::{DockArea, DockState, Style, TabViewer};
 
 use crate::{
     debugger::debug_em::HackSystem,
-    ui::app::{AppWindow, UpdateType},
+    ui::app::{AppMessage, UpdateType},
 };
 
 /// We identify tabs by the title of the file we are editing.
@@ -43,17 +43,17 @@ pub struct FilesWindow {
 impl Default for FilesWindow {
     fn default() -> Self {
         let mut buffers = BTreeMap::default();
-        buffers.insert(
-            "file1".to_owned(),
-            std::fs::read_to_string(Path::new("c:\\work\\hackem\\cargo.toml")).unwrap(),
-        );
+        //  buffers.insert(
+        //     "file1".to_owned(),
+        //       std::fs::read_to_string(Path::new("c:\\work\\hackem\\cargo.toml")).unwrap(),
+        //   );
         // buffers.insert("LICENSE".to_owned(), include_str!("../LICENSE").to_owned());
         // buffers.insert(
         //     "README.md".to_owned(),
         //     include_str!("../README.md").to_owned(),
         // );
 
-        let tree = DockState::new(vec!["file1".to_owned()]);
+        let tree = DockState::new(vec![]);
 
         Self {
             buffers: Buffers { buffers },
@@ -61,8 +61,30 @@ impl Default for FilesWindow {
         }
     }
 }
-impl AppWindow for FilesWindow {
-    fn draw(&mut self, ctx: &egui::Context, open: &mut bool, _hacksys: &HackSystem) {
+impl FilesWindow {
+    pub fn draw(
+        &mut self,
+        ctx: &egui::Context,
+        open: &mut bool,
+        hacksys: &HackSystem,
+    ) -> Option<AppMessage> {
+        for file in hacksys.pdb.file_info.iter() {
+            let title = file
+                .name
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .to_owned()
+                .to_string();
+            if self.buffers.buffers.contains_key(&title) {
+                continue;
+            }
+            let path = Path::new(&file.name);
+            if path.exists() {
+                println!("Adding file: {:?} {}", path, title);
+                self.add_file(path);
+            }
+        }
         egui::Window::new(self.name())
             .id(Id::new(self.name()))
             .open(open)
@@ -70,12 +92,18 @@ impl AppWindow for FilesWindow {
             .show(ctx, |ui| {
                 self.ui(ui);
             });
+        None
     }
-
-    fn name(&self) -> &'static str {
+    pub fn add_file(&mut self, path: &Path) {
+        let title = path.file_name().unwrap().to_string_lossy().to_string();
+        let text = std::fs::read_to_string(path).unwrap();
+        self.buffers.buffers.insert(title.clone(), text);
+        self.tree.push_to_focused_leaf(title);
+    }
+    pub fn name(&self) -> &'static str {
         "Files"
     }
-    fn update(&mut self, msg: crate::ui::app::UpdateMessage, _hacksys: &HackSystem) {
+    pub fn update(&mut self, msg: crate::ui::app::UpdateMessage, _hacksys: &HackSystem) {
         match msg.message {
             UpdateType::Text(_output) => {
                 // self.text.push_str("\n");
@@ -85,8 +113,7 @@ impl AppWindow for FilesWindow {
             } //_ => {}
         }
     }
-}
-impl FilesWindow {
+
     pub fn new() -> Self {
         Self::default()
     }

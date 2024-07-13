@@ -1,5 +1,3 @@
-#![warn(clippy::all, rust_2018_idioms)]
-
 use std::collections::BTreeMap;
 
 use crate::ui::app::{RuntimeError, CURRENT_KEY};
@@ -77,7 +75,7 @@ impl HackEngine {
     }
     fn set_ram(&mut self, address: u16, value: u16) -> Result<()> {
         if address >= 0x8000 {
-            println!("Invalid address {:04x} at {:04x}", address, self.pc);
+            //  println!("Invalid address {:04x} at {:04x}", address, self.pc);
             bail!(RuntimeError::InvalidWriteAddress(address));
         }
 
@@ -102,7 +100,7 @@ impl HackEngine {
     }
     fn get_ram(&mut self, address: u16) -> Result<u16> {
         if address >= 0x8000 {
-            println!("Invalid address {:04x} at {:04x}", address, self.pc);
+            //    println!("Invalid address {:04x} at {:04x}", address, self.pc);
             bail!(RuntimeError::InvalidReadAddress(address));
         }
         if address == 0x6000 {
@@ -201,10 +199,10 @@ impl HackEngine {
                     if d & 0x2 != 0 {
                         self.d = alu_out;
                     }
-                    // A
-                    if d & 0x4 != 0 {
-                        self.a = alu_out;
-                    }
+                    // A (update is deferred til after jmp is tested)
+                    // see http://nand2tetris-questions-and-answers-forum.52.s1.nabble.com/Subtle-different-behaviors-between-the-CPU-emulator-and-the-proposed-CPU-design-td4034781.html
+                    let new_a = if d & 0x4 != 0 { alu_out } else { self.a };
+
                     let pc = self.pc;
 
                     if j & 0x1 != 0 && (alu_out as i16) > 0 {
@@ -216,6 +214,8 @@ impl HackEngine {
                     if j & 0x4 != 0 && (alu_out as i16) < 0 {
                         self.pc = self.a;
                     }
+
+                    self.a = new_a;
                     // detects halt loop
                     // (halt)
                     // @halt
@@ -236,6 +236,14 @@ impl HackEngine {
     }
     pub fn get_registers(&self) -> (u16, u16, u16) {
         (self.pc, self.a, self.d)
+    }
+
+    pub fn add_breakpoint(&mut self, address: u16) {
+        let bp = BreakPoint {
+            address,
+            enabled: true,
+        };
+        self.break_points.insert(address, bp);
     }
 }
 #[macro_export]

@@ -35,7 +35,11 @@ macro_rules! verbose {
     };
 }
 
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::RefCell,
+    ops::{Deref, DerefMut},
+    rc::Rc,
+};
 
 use once_cell::sync::OnceCell;
 pub static SAY_CB: OnceCell<fn(&str, bool)> = OnceCell::new();
@@ -55,3 +59,15 @@ pub fn new_shared<T>(t: T) -> SharedPtr<T> {
         ptr: Rc::new(RefCell::new(t)),
     }
 }
+
+// impl<T> Deref for SharedPtr<T> {
+//     type Target = T;
+//     fn deref(&self) -> &Self::Target {
+//         &self.ptr.borrow()
+//     }
+// }
+// impl<T> DerefMut for SharedPtr<T> {
+//     fn deref_mut(&mut self) -> &mut Self::Target {
+//         &mut self.ptr.borrow_mut()
+//     }
+// }
