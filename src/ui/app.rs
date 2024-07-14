@@ -10,7 +10,10 @@ use thiserror::Error;
 use web_time::Duration;
 
 use super::widgets::{
-    console::ConsoleWindow, cpu::CpuWindow, files::FilesWindow, screen::ScreenWindow,
+    console::{ConsoleEvent, ConsoleWindow},
+    cpu::CpuWindow,
+    files::FilesWindow,
+    screen::ScreenWindow,
 };
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 //#[derive(serde::Deserialize, serde::Serialize)]
@@ -25,8 +28,6 @@ pub struct HackEgui {
     text: String,
     console: String,
     // pub windows: Vec<Box<dyn AppWindow>>,
-    init: bool,
-
     console_window: ConsoleWindow,
     screen_window: ScreenWindow,
     cpu_window: CpuWindow,
@@ -45,12 +46,12 @@ pub enum RuntimeError {
     InvalidPC(u16),
 }
 
-pub enum AppMessage {
-    LoadBinary(String),
-    ConsoleCommand(String),
-    Quit,
-    None,
-}
+// pub enum AppMessage {
+//     LoadBinary(String),
+//     ConsoleCommand(String),
+//     Quit,
+//     None,
+// }
 pub struct UpdateMessage {
     pub message: UpdateType,
     //pub widget: Id,
@@ -58,28 +59,10 @@ pub struct UpdateMessage {
 pub enum UpdateType {
     Text(String),
 }
-// pub trait AppWindow {
-//     fn draw(
-//         &mut self,
-//         ctx: &egui::Context,
-//         open: &mut bool,
-//         hacksys: &HackSystem,
-//     ) -> Option<AppMessage>;
-//     fn update(&mut self, _msg: UpdateMessage, _hacksys: &HackSystem) {}
-//     fn name(&self) -> &'static str;
-//     // fn keyboard_peek(&mut self, _ctx: &egui::Context, _hacksys: &HackSystem) -> Option<AppMessage> {
-//     //     None
-//     // }
-//     fn id(&self) -> Id {
-//         Id::new(self.name())
-//     }
-// }
-// ascii value of current key
 
-pub(crate) static mut CURRENT_KEY: u8 = 0;
 impl HackEgui {
     /// Called once before the first frame.
-    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
 
@@ -89,37 +72,47 @@ impl HackEgui {
         //     return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
         // }
 
-        Self {
+        let mut ret = Self {
             hacksys: HackSystem::new(),
             running: false,
             elapsed: Duration::from_secs(0),
             text: String::new(),
             console: String::new(),
-            // windows: vec![
-            //     Box::new(ConsoleWindow::new()),
-            //     Box::new(ScreenWindow::new()),
-            //     Box::new(CpuWindow::new()),
-            //     Box::new(FilesWindow::new()),
-            // ],
-            init: true,
+
             console_window: ConsoleWindow::new(">> "),
             screen_window: ScreenWindow::new(),
             cpu_window: CpuWindow::new(),
             files_window: FilesWindow::new(),
+
             shell: Shell::new(),
+        };
+        ret.once(&cc.egui_ctx);
+        ret
+    }
+    fn save_history(&self) {
+        if cfg!(target_arch = "wasm32") {
+        } else {
+            if let Some(home) = dirs::home_dir() {
+                let history_path = home.join(".hackem_history");
+
+                let history = self.console_window.get_history();
+                std::fs::write(history_path, history.join("\n")).unwrap();
+            }
         }
     }
-
-    // fn draw_ram(&mut self, ui: &mut Ui) {
-    //     let screen = self.hacksys.get_screen_ram();
-    //     egui::Grid::new("RAM").num_columns(2).show(ui, |ui| {
-    //         for i in 0..100 {
-    //             ui.label(format!("0x{:04X}", i));
-    //             ui.label(format!("0x{:04X}", screen[i as usize]));
-    //             ui.end_row();
-    //         }
-    //     });
-    // }
+    fn once(&mut self, ctx: &egui::Context) {
+        // boot up stuff
+        if cfg!(target_arch = "wasm32") {
+        } else {
+            if let Some(home) = dirs::home_dir() {
+                let history_path = home.join(".hackem_history");
+                if let Ok(history) = std::fs::read_to_string(history_path) {
+                    self.console_window.load_history(history.lines());
+                }
+            }
+        }
+        egui_extras::install_image_loaders(ctx);
+    }
 }
 
 impl eframe::App for HackEgui {
@@ -130,107 +123,24 @@ impl eframe::App for HackEgui {
 
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        if self.init {
-            if cfg!(target_arch = "wasm32") {
-            } else {
-                if let Ok(history) = std::fs::read_to_string(".history") {
-                    self.console_window.load_history(history.lines());
-                }
-            }
-            self.init = false;
-        }
-        egui_extras::install_image_loaders(ctx);
         // Put your widgets into a `SidePanel`, `TopBottomPanel`, `CentralPanel`, `Window` or `Area`.
         // For inspiration and more examples, go to https://emilk.github.io/egui
         let mut open = true;
-        let mut app_msg = AppMessage::None;
-        if !ctx.wants_keyboard_input() {
-            ctx.input(|inp| {
-                // log::trace!("{:?}", inp);
-                if !inp.keys_down.is_empty() {
-                    println!(
-                        "{:?} {:?} {} ",
-                        inp.keys_down,
-                        inp.modifiers,
-                        inp.keys_down.len()
-                    );
-                    lookup_key(inp);
-                    println!("xkey: {}", unsafe { CURRENT_KEY as char });
-                } else {
-                    unsafe {
-                        CURRENT_KEY = 0;
-                    }
-                }
-                if let Some(egui::Event::Text(text)) = inp.events.first() {
-                    // if let egui::Event::Text(text) = ev {
-                    println!("Text {:?}", text);
-                    unsafe {
-                        CURRENT_KEY = text.chars().next().unwrap() as u8;
-                    }
-                    //}
-                }
-            });
-        } else {
-            // pass events to out windows, see if they want to do anything with them
-            // if they do, we will get a message back
-            if let Some(id) = ctx.memory(|mem| mem.focused()) {
-                println!("focus {:?}", id);
-                // for window in self.windows.iter_mut() {
-                //     if id == window.id() {
-                //         if let Some(msg) = window.keyboard_peek(ctx, &self.hacksys) {
-                //             app_msg = msg;
-                //         }
-                //         break;
-                //     }
-                // }
-            }
-        }
 
-        // execute the message we got
-        match app_msg {
-            AppMessage::LoadBinary(bin) => {
-                let _ = self.hacksys.engine.load_file(&bin);
-            }
-            AppMessage::ConsoleCommand(cmd) => {
-                //let id = self.windows[0].id();
-                //let cw = &mut self.windows[0];
+        // draw all our windows
 
-                if let Ok(response) = self.shell.execute_message(&cmd, &mut self.hacksys) {
-                    self.console_window.update(UpdateMessage {
-                        message: UpdateType::Text(response),
-                        //  widget: id,
-                    });
-                }
-            }
-            AppMessage::Quit => {
-                if cfg!(target_arch = "wasm32") {
-                } else {
-                    let history = self.console_window.get_history();
-                    std::fs::write(".history", history.join("\n")).unwrap();
-                }
-                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-            }
-            AppMessage::None => {}
-        }
-
-        // draw our widget windows
-
-        // for window in self.windows.iter_mut() {
-        //     window.draw(ctx, &mut open, &self.hacksys);
-        // }
-        if let AppMessage::ConsoleCommand(cmd) =
-            self.console_window.draw(ctx, &mut open, &self.hacksys)
-        {
-            if let Ok(response) = self.shell.execute_message(&cmd, &mut self.hacksys) {
-                self.console_window.update(UpdateMessage {
-                    message: UpdateType::Text(response),
-                    //  widget: id,
-                });
-            }
-        }
+        let console_response = self.console_window.draw(ctx, &mut open, &self.hacksys);
         self.screen_window.draw(ctx, &mut open, &self.hacksys);
         self.cpu_window.draw(ctx, &mut open, &self.hacksys);
         self.files_window.draw(ctx, &mut open, &self.hacksys);
+
+        if let ConsoleEvent::Command(cmd) = console_response {
+            // get shell to execute the command
+            if let Ok(response) = self.shell.execute_message(&cmd, &mut self.hacksys) {
+                // some output in response
+                self.console_window.sync_response(&response);
+            }
+        }
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
@@ -251,11 +161,7 @@ impl eframe::App for HackEgui {
                     }
 
                     if ui.button("Quit").clicked() {
-                        if cfg!(target_arch = "wasm32") {
-                        } else {
-                            let history = self.console_window.get_history();
-                            std::fs::write(".history", history.join("\n")).unwrap();
-                        }
+                        self.save_history();
                         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                     }
                 });
@@ -272,29 +178,9 @@ impl eframe::App for HackEgui {
             }
         });
 
-        egui::Window::new("xxxx")
+        egui::Window::new("ui debug")
             .default_height(500.0)
             .show(ctx, |ui| ctx.inspection_ui(ui));
-        // egui::Window::new("screen2")
-        //     .default_height(500.0)
-        //     .show(ctx, |ui| {
-        //         //let mut string = "".to_string();
-        //         ui.add(
-        //             egui::TextEdit::singleline(&mut self.text).hint_text("Write something here"),
-        //         );
-        //         ui.end_row();
-        //         let egui_icon = egui::include_image!("../../data/fast-forward.svg");
-        //         if ui
-        //             .add(egui::Button::image_and_text(egui_icon, "Run"))
-        //             .clicked()
-        //         {
-        //             //*boolean = !*boolean;
-        //         }
-        //     });
-
-        // egui::Window::new("RAM")
-        //     .default_height(500.0)
-        //     .show(ctx, |ui| self.draw_ram(ui));
 
         // run instructions until we hit a stop condition
         // - time out after the supliied number of ms draw next screen frame)
@@ -310,6 +196,7 @@ impl eframe::App for HackEgui {
                 Ok(reason) => match reason {
                     StopReason::SysHalt => {
                         self.running = false;
+                        self.console_window.async_message("SysHalt hit");
                     }
                     StopReason::HardLoop => {
                         self.running = false;

@@ -6,10 +6,7 @@ use eframe::egui;
 use egui::{Id, Ui, WidgetText};
 use egui_dock::{DockArea, DockState, Style, TabViewer};
 
-use crate::{
-    debugger::debug_em::HackSystem,
-    ui::app::{AppMessage, UpdateType},
-};
+use crate::{debugger::debug_em::HackSystem, ui::app::UpdateType};
 
 /// We identify tabs by the title of the file we are editing.
 type Title = String;
@@ -62,12 +59,7 @@ impl Default for FilesWindow {
     }
 }
 impl FilesWindow {
-    pub fn draw(
-        &mut self,
-        ctx: &egui::Context,
-        open: &mut bool,
-        hacksys: &HackSystem,
-    ) -> Option<AppMessage> {
+    pub fn draw(&mut self, ctx: &egui::Context, open: &mut bool, hacksys: &HackSystem) {
         for file in hacksys.pdb.file_info.iter() {
             let title = file
                 .name
@@ -92,7 +84,7 @@ impl FilesWindow {
             .show(ctx, |ui| {
                 self.ui(ui);
             });
-        None
+        // None
     }
     pub fn add_file(&mut self, path: &Path) {
         let title = path.file_name().unwrap().to_string_lossy().to_string();

@@ -1,6 +1,6 @@
 use egui::{InputState, Key};
 
-use crate::ui::app::CURRENT_KEY;
+use super::widgets::screen::CURRENT_KEY;
 
 pub(crate) fn lookup_key(input: &InputState) {
     match input.keys_down.iter().next().unwrap() {

@@ -4,11 +4,12 @@ use egui::{
     text::CCursorRange, Align, Context, Event, EventFilter, Id, Key, Modifiers, TextEdit, Ui,
 };
 
-use crate::{
-    debugger::debug_em::HackSystem,
-    ui::app::{AppMessage, UpdateMessage, UpdateType},
-};
-
+use crate::{debugger::debug_em::HackSystem, ui::app::UpdateType};
+pub enum ConsoleEvent {
+    Command(String),
+    CtrlC,
+    None,
+}
 pub(crate) struct ConsoleWindow {
     text: String,
     new_line: bool,
@@ -218,7 +219,7 @@ impl ConsoleWindow {
                 .push_str(self.command_history[self.history_cursor as usize].as_str());
         }
     }
-    fn handle_kb(&mut self, ctx: &egui::Context, _hacksys: &HackSystem) -> AppMessage {
+    fn handle_kb(&mut self, ctx: &egui::Context, _hacksys: &HackSystem) -> ConsoleEvent {
         // process all the key events in the queue
         // if they are meaningful to the console then use them and consume them
         // otherwise pass along to the textedit widget
@@ -267,9 +268,9 @@ impl ConsoleWindow {
         }
 
         if let Some(command) = command {
-            return AppMessage::ConsoleCommand(command);
+            return ConsoleEvent::Command(command);
         }
-        AppMessage::None
+        ConsoleEvent::None
     }
 
     pub fn draw(
@@ -277,17 +278,11 @@ impl ConsoleWindow {
         ctx: &egui::Context,
         open: &mut bool,
         hacksys: &HackSystem,
-    ) -> AppMessage {
-        let msg = if let Some(id) = ctx.memory(|mem| mem.focused()) {
-            if id == Id::new("console_text") {
-                self.handle_kb(ctx, hacksys)
-            } else {
-                AppMessage::None
-            }
+    ) -> ConsoleEvent {
+        let msg = if ctx.memory(|mem| mem.has_focus(self.id)) {
+            self.handle_kb(ctx, hacksys)
         } else {
-            {
-                AppMessage::None
-            }
+            ConsoleEvent::None
         };
 
         egui::Window::new(self.name())
@@ -313,18 +308,15 @@ impl ConsoleWindow {
         }
         msg
     }
-    pub fn update(&mut self, msg: crate::ui::app::UpdateMessage) {
-        if let UpdateType::Text(output) = msg.message {
-            self.text
-                .push_str(&format!("\n{}\n{}", output, self.prompt));
-            self.new_line = true;
-        }
+    pub fn sync_response(&mut self, data: &str) {
+        self.text.push_str(&format!("\n{}\n{}", data, self.prompt));
+        self.new_line = true;
+    }
+    pub fn async_message(&mut self, data: &str) {
+        self.text.push_str(&format!("\n{}\n{}", data, self.prompt));
+        self.new_line = true;
     }
     fn name(&self) -> &'static str {
         "Console Window"
-    }
-
-    fn id(&self) -> Id {
-        self.id
     }
 }

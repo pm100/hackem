@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
-use crate::trace;
-use crate::ui::app::{RuntimeError, CURRENT_KEY};
+use crate::{trace, ui::app::RuntimeError};
+
+use crate::ui::widgets::screen::CURRENT_KEY;
 use anyhow::{bail, Result};
 use web_time::{Duration, Instant};
 struct BreakPoint {
@@ -151,7 +152,7 @@ impl HackEngine {
             match opcode {
                 0 => {
                     // A instruction
-                    trace!("0x{:04x}  {:04x}", self.pc - 1, instruction);
+                    // trace!("0x{:04x}  {:04x}", self.pc - 1, instruction);
                     self.a = instruction;
                 }
                 1 => {
@@ -167,19 +168,19 @@ impl HackEngine {
                         bail!(RuntimeError::InvalidInstruction);
                     }
 
-                    let m = if a < 0x8000 {
-                        format!("{:04x}", self.get_ram(a).unwrap())
-                    } else {
-                        "????".to_string()
-                    };
-                    trace!(
-                        "0x{:04x}: {:04x} A={:04x} D={:04x} M={}",
-                        self.pc - 1,
-                        instruction,
-                        self.a,
-                        self.d,
-                        m
-                    );
+                    // let m = if a < 0x8000 {
+                    //     format!("{:04x}", self.get_ram(a).unwrap())
+                    // } else {
+                    //     "????".to_string()
+                    // };
+                    // trace!(
+                    //     "0x{:04x}: {:04x} A={:04x} D={:04x} M={}",
+                    //     self.pc - 1,
+                    //     instruction,
+                    //     self.a,
+                    //     self.d,
+                    //     m
+                    //);
                     let y = if a == 0 {
                         self.a
                     } else {

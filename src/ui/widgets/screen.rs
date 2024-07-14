@@ -1,16 +1,20 @@
 use egui::{Id, Pos2, Sense, Ui, Vec2};
 
-use crate::{debugger::debug_em::HackSystem, ui::app::AppMessage};
+use crate::{debugger::debug_em::HackSystem, ui::key_lookup::lookup_key};
 const SCREEN_WIDTH: usize = 512;
 const SCREEN_HEIGHT: usize = 256;
+
+pub(crate) static mut CURRENT_KEY: u8 = 0;
 pub struct ScreenWindow {
     // hacksys: &'hack HackSystem,
     id: Id,
+    paint_id: Id,
 }
 impl ScreenWindow {
     pub fn new() -> Self {
         Self {
             id: Id::new("Screen"),
+            paint_id: Id::new("Screen"),
         }
     }
 
@@ -24,6 +28,11 @@ impl ScreenWindow {
             Vec2::new(SCREEN_WIDTH as f32, SCREEN_HEIGHT as f32) + Vec2::splat(1.0);
         let sense = Sense::click(); // Sense::focusable_noninteractive();
         let (response, painter) = ui.allocate_painter(draw_area_size, sense);
+        self.paint_id = response.id;
+        if response.clicked() {
+            response.request_focus();
+            println!("xccc{:?}", response.id);
+        }
 
         let top_left = Pos2::new(response.rect.min.x * 1.0, response.rect.min.y * 1.0).ceil();
         // response.request_focus();
@@ -50,12 +59,37 @@ impl ScreenWindow {
         }
     }
 
-    pub fn draw(
-        &mut self,
-        ctx: &egui::Context,
-        open: &mut bool,
-        hacksys: &HackSystem,
-    ) -> Option<AppMessage> {
+    pub fn draw(&mut self, ctx: &egui::Context, open: &mut bool, hacksys: &HackSystem) {
+        if ctx.memory(|mem| {
+            // println!("{:?} {:?}", mem.focused(), self.paint_id);
+            mem.has_focus(self.paint_id)
+        }) {
+            ctx.input(|inp| {
+                // println!("xx{:?}", inp);
+                if !inp.keys_down.is_empty() {
+                    println!(
+                        "{:?} {:?} {} ",
+                        inp.keys_down,
+                        inp.modifiers,
+                        inp.keys_down.len()
+                    );
+                    lookup_key(inp);
+                    println!("xkey: {}", unsafe { CURRENT_KEY as char });
+                } else {
+                    unsafe {
+                        CURRENT_KEY = 0;
+                    }
+                }
+                if let Some(egui::Event::Text(text)) = inp.events.first() {
+                    // if let egui::Event::Text(text) = ev {
+                    println!("Text {:?}", text);
+                    unsafe {
+                        CURRENT_KEY = text.chars().next().unwrap() as u8;
+                    }
+                    //}
+                }
+            });
+        };
         egui::Window::new(self.name())
             .id(self.id)
             .open(open)
@@ -63,9 +97,6 @@ impl ScreenWindow {
             .show(ctx, |ui| {
                 self.ui(ui, hacksys);
             });
-        ctx.memory_mut(|mem| mem.interested_in_focus(self.id));
-
-        None
     }
 
     fn name(&self) -> &'static str {

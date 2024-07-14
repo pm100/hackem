@@ -1,6 +1,6 @@
 use egui::Id;
 
-use crate::{debugger::debug_em::HackSystem, ui::app::AppMessage};
+use crate::debugger::debug_em::HackSystem;
 
 pub struct CpuWindow {}
 
@@ -40,12 +40,7 @@ impl CpuWindow {
         "Cpu"
     }
 
-    pub fn draw(
-        &mut self,
-        ctx: &egui::Context,
-        open: &mut bool,
-        hacksys: &HackSystem,
-    ) -> Option<AppMessage> {
+    pub fn draw(&mut self, ctx: &egui::Context, open: &mut bool, hacksys: &HackSystem) {
         egui::Window::new(self.name())
             .id(Id::new(self.name()))
             .open(open)
@@ -53,6 +48,6 @@ impl CpuWindow {
             .show(ctx, |ui| {
                 self.ui(ui, hacksys);
             });
-        None
+        //  None
     }
 }
