@@ -5,10 +5,13 @@ const SCREEN_WIDTH: usize = 512;
 const SCREEN_HEIGHT: usize = 256;
 pub struct ScreenWindow {
     // hacksys: &'hack HackSystem,
+    id: Id,
 }
 impl ScreenWindow {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            id: Id::new("Screen"),
+        }
     }
 
     fn ui(&mut self, ui: &mut Ui, hacksys: &HackSystem) {
@@ -19,10 +22,11 @@ impl ScreenWindow {
         };
         let draw_area_size =
             Vec2::new(SCREEN_WIDTH as f32, SCREEN_HEIGHT as f32) + Vec2::splat(1.0);
-        let sense = Sense::hover(); // Sense::focusable_noninteractive();
+        let sense = Sense::click(); // Sense::focusable_noninteractive();
         let (response, painter) = ui.allocate_painter(draw_area_size, sense);
 
         let top_left = Pos2::new(response.rect.min.x * 1.0, response.rect.min.y * 1.0).ceil();
+        // response.request_focus();
         let screen = &hacksys.engine.ram[0x4000..0x6000];
         for row in 0..SCREEN_HEIGHT {
             for col in 0..SCREEN_WIDTH / 16 {
@@ -53,12 +57,14 @@ impl ScreenWindow {
         hacksys: &HackSystem,
     ) -> Option<AppMessage> {
         egui::Window::new(self.name())
-            .id(Id::new(self.name()))
+            .id(self.id)
             .open(open)
             .default_height(500.0)
             .show(ctx, |ui| {
                 self.ui(ui, hacksys);
             });
+        ctx.memory_mut(|mem| mem.interested_in_focus(self.id));
+
         None
     }
 

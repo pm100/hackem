@@ -174,7 +174,7 @@ impl eframe::App for HackEgui {
             // pass events to out windows, see if they want to do anything with them
             // if they do, we will get a message back
             if let Some(id) = ctx.memory(|mem| mem.focused()) {
-                //println!("focus {:?}", id);
+                println!("focus {:?}", id);
                 // for window in self.windows.iter_mut() {
                 //     if id == window.id() {
                 //         if let Some(msg) = window.keyboard_peek(ctx, &self.hacksys) {

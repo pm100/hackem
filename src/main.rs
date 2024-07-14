@@ -34,8 +34,6 @@ mod debugger {
 
 pub use ui::app::HackEgui;
 
-
-
 use simplelog::*;
 use std::fs::File;
 
@@ -43,7 +41,7 @@ use std::fs::File;
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
     CombinedLogger::init(vec![WriteLogger::new(
-        LevelFilter::Trace,
+        LevelFilter::Off,
         Config::default(),
         File::create("my_rust_binary.log").unwrap(),
     )])

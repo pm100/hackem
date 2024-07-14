@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 
+use crate::trace;
 use crate::ui::app::{RuntimeError, CURRENT_KEY};
 use anyhow::{bail, Result};
 use web_time::{Duration, Instant};
-
 struct BreakPoint {
     address: u16,
     enabled: bool,
@@ -122,11 +122,7 @@ impl HackEngine {
             if self.pc >= 0x8000 {
                 bail!(RuntimeError::InvalidPC(self.pc));
             }
-            if let Some(bp) = self.break_points.get(&self.pc) {
-                if bp.enabled {
-                    return Ok(StopReason::BreakPoint);
-                }
-            }
+
             counter += 1;
             // every chunk of instructions check to see if we should refresh the UI
             // by returning to the caller
@@ -149,12 +145,13 @@ impl HackEngine {
                 return Ok(StopReason::SysHalt);
             }
             let opcode = instruction >> 15;
+            let old_pc = self.pc;
 
             self.pc += 1;
             match opcode {
                 0 => {
                     // A instruction
-                    //trace!("0x{:04x}  {:04x}", self.pc - 1, instruction);
+                    trace!("0x{:04x}  {:04x}", self.pc - 1, instruction);
                     self.a = instruction;
                 }
                 1 => {
@@ -170,19 +167,19 @@ impl HackEngine {
                         bail!(RuntimeError::InvalidInstruction);
                     }
 
-                    // let m = if a < 0x8000 {
-                    //     format!("{:04x}", self.get_ram(a))
-                    // } else {
-                    //     "????".to_string()
-                    // };
-                    // trace!(
-                    //     "0x{:04x}: {:04x} A={:04x} D={:04x} M={}",
-                    //     self.pc - 1,
-                    //     instruction,
-                    //     self.a,
-                    //     self.d,
-                    //     m
-                    // )
+                    let m = if a < 0x8000 {
+                        format!("{:04x}", self.get_ram(a).unwrap())
+                    } else {
+                        "????".to_string()
+                    };
+                    trace!(
+                        "0x{:04x}: {:04x} A={:04x} D={:04x} M={}",
+                        self.pc - 1,
+                        instruction,
+                        self.a,
+                        self.d,
+                        m
+                    );
                     let y = if a == 0 {
                         self.a
                     } else {
@@ -227,6 +224,11 @@ impl HackEngine {
                 }
                 _ => {
                     bail!(RuntimeError::InvalidInstruction);
+                }
+            }
+            if let Some(bp) = self.break_points.get(&old_pc) {
+                if bp.enabled {
+                    return Ok(StopReason::BreakPoint);
                 }
             }
             if run_time == Duration::ZERO {
