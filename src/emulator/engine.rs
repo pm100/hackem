@@ -74,7 +74,7 @@ impl HackEngine {
             x & y
         }
     }
-    fn set_ram(&mut self, address: u16, value: u16) -> Result<()> {
+    pub fn set_ram(&mut self, address: u16, value: u16) -> Result<()> {
         if address >= 0x8000 {
             //  println!("Invalid address {:04x} at {:04x}", address, self.pc);
             bail!(RuntimeError::InvalidWriteAddress(address));
@@ -99,7 +99,7 @@ impl HackEngine {
         }
         Ok(())
     }
-    fn get_ram(&mut self, address: u16) -> Result<u16> {
+    pub fn get_ram(&self, address: u16) -> Result<u16> {
         if address >= 0x8000 {
             //    println!("Invalid address {:04x} at {:04x}", address, self.pc);
             bail!(RuntimeError::InvalidReadAddress(address));

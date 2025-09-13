@@ -65,6 +65,7 @@ impl Shell {
                 let file = args.get_one::<String>("file").unwrap();
                 let pdb_json = std::fs::read_to_string(Path::new(file))?;
                 hacksys.pdb = Pdb::load_json(&pdb_json)?;
+                hacksys.load_waw()?;
                 Ok(format!("Loaded pdb file {}", file))
             }
             Some(("cd", args)) => {
@@ -101,9 +102,22 @@ impl Shell {
             Some(("break", args)) => {
                 let addr = args.get_one::<String>("address").unwrap();
                 let addr = self.expand_expr(addr, hacksys)?;
-                let addr = u16::from_str_radix(&addr[1..], 16)?;
+                let addr = u16::from_str_radix(&addr[0..], 16)?;
                 hacksys.engine.add_breakpoint(addr);
                 Ok(format!("Added breakpoint at 0x{:04x}", addr))
+            }
+            Some(("display_memory", args)) => {
+                // let addr = args.get_one::<String>("address").unwrap();
+                // let addr = self.expand_expr(addr, hacksys)?;
+                // let addr = u16::from_str_radix(&addr[1..], 16)?;
+                // let value = hacksys.engine.read_memory(addr);
+                // Ok(format!("Memory at 0x{:04x}: {}", addr, value))
+
+                for i in 0..0x4000 {
+                    let value = hacksys.engine.get_ram(i)?;
+                    println!("0x{:04x}: {:04x}", i, value);
+                }
+                Ok(format!("Displayed memory from 0x0000 to 0x3FFF"))
             }
             _ => Ok("huh?".to_string()),
         }

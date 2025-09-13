@@ -33,6 +33,11 @@ impl CpuWindow {
             ui.label("Elapsed: ");
             //  ui.label(format!("{}", hacksys.elapsed.as_secs()));
             ui.end_row();
+            for i in 0..16 {
+                ui.label(format!("R{}: ", i));
+                ui.label(format!("0x{:04X}", hacksys.engine.get_ram(i).unwrap()));
+                ui.end_row();
+            }
         });
     }
 
@@ -44,7 +49,7 @@ impl CpuWindow {
         egui::Window::new(self.name())
             .id(Id::new(self.name()))
             .open(open)
-            .default_height(500.0)
+            .default_height(600.0)
             .show(ctx, |ui| {
                 self.ui(ui, hacksys);
             });

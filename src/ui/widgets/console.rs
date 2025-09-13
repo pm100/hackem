@@ -303,6 +303,10 @@ impl ConsoleWindow {
                 //..Default::default()
             };
             if ctx.memory(|mem| mem.has_focus(self.id)) {
+                println!(
+                    "Console focus: set filter {:?}",
+                    self.id.short_debug_format()
+                );
                 ctx.memory_mut(|mem| mem.set_focus_lock_filter(self.id, event_filter));
             }
         }

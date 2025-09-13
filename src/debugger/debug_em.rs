@@ -1,8 +1,8 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, collections::BTreeMap};
 
 use common::pdb::database::Pdb;
 
-use super::shell::Shell;
+use super::{pdbio::CodeLocation, shell::Shell};
 use crate::emulator::engine::HackEngine;
 use anyhow::{bail, Result};
 
@@ -10,6 +10,7 @@ pub struct HackSystem {
     pub engine: HackEngine,
     // pub shell: Shell,
     pub pdb: Pdb,
+    pub waw: BTreeMap<u16, CodeLocation>,
     pub(crate) expr_value: RefCell<evalexpr::Value>,
 }
 impl Default for HackSystem {
@@ -25,6 +26,7 @@ impl HackSystem {
             //  shell: Shell::new(),
             pdb: Pdb::new(),
             expr_value: RefCell::new(evalexpr::Value::Int(0)),
+            waw: BTreeMap::new(),
         }
     }
     // converts a string representing an address into an address

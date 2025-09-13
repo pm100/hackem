@@ -6,7 +6,7 @@ mod utils;
 // the egui ui
 mod ui {
     pub mod widgets {
-        pub mod console;
+        // pub mod console;
         pub mod cpu;
         pub mod files;
         pub mod screen;
@@ -26,6 +26,7 @@ mod emulator {
 // the main application
 mod debugger {
     pub mod debug_em;
+    pub mod disassemble;
     pub mod expr;
     pub mod pdbio;
     pub mod shell;

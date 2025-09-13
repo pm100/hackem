@@ -1,4 +1,4 @@
-use crate::{say, utils};
+use crate::{debugger::disassemble::Disassembler, say, utils};
 
 use super::engine::HackEngine;
 use anyhow::Result;
@@ -67,6 +67,12 @@ impl HackEngine {
             }
         }
         say!("Loaded file");
+        for i in 0..100 {
+            let inst = self.rom[i as usize];
+            let inst_str = Disassembler::disassemble(inst);
+            say!("Code[{}] = {:04x} ({})", i, inst, inst_str);
+        }
+        self.pc = 0;
         Ok(())
     }
 }

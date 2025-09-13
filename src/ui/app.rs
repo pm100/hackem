@@ -6,15 +6,15 @@ use crate::{
 
 use egui::Id;
 
-use thiserror::Error;
-use web_time::Duration;
-
 use super::widgets::{
-    console::{ConsoleEvent, ConsoleWindow},
+    // console::{ConsoleEvent, ConsoleWindow},
     cpu::CpuWindow,
     files::FilesWindow,
     screen::ScreenWindow,
 };
+use egui_console::{ConsoleBuilder, ConsoleEvent, ConsoleWindow};
+use thiserror::Error;
+use web_time::Duration;
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 //#[derive(serde::Deserialize, serde::Serialize)]
 //#[serde(default)] // if we add new fields, give them default values when deserializing old state
@@ -29,6 +29,7 @@ pub struct HackEgui {
     console: String,
     // pub windows: Vec<Box<dyn AppWindow>>,
     console_window: ConsoleWindow,
+    console_window_open: bool,
     screen_window: ScreenWindow,
     cpu_window: CpuWindow,
     files_window: FilesWindow,
@@ -79,7 +80,12 @@ impl HackEgui {
             text: String::new(),
             console: String::new(),
 
-            console_window: ConsoleWindow::new(">> "),
+            console_window: ConsoleBuilder::new()
+                .prompt(">> ")
+                .history_size(20)
+                .tab_quote_character('\"')
+                .build(),
+            console_window_open: false,
             screen_window: ScreenWindow::new(),
             cpu_window: CpuWindow::new(),
             files_window: FilesWindow::new(),
@@ -95,7 +101,7 @@ impl HackEgui {
             if let Some(home) = dirs::home_dir() {
                 let history_path = home.join(".hackem_history");
 
-                let history = self.console_window.get_history();
+                let history = Vec::from(self.console_window.get_history());
                 std::fs::write(history_path, history.join("\n")).unwrap();
             }
         }
@@ -111,6 +117,7 @@ impl HackEgui {
                 }
             }
         }
+        self.console_window_open = true;
         egui_extras::install_image_loaders(ctx);
     }
 }
@@ -129,18 +136,18 @@ impl eframe::App for HackEgui {
 
         // draw all our windows
 
-        let console_response = self.console_window.draw(ctx, &mut open, &self.hacksys);
+        // let console_response = self.console_window.draw(ctx);
         self.screen_window.draw(ctx, &mut open, &self.hacksys);
         self.cpu_window.draw(ctx, &mut open, &self.hacksys);
         self.files_window.draw(ctx, &mut open, &self.hacksys);
 
-        if let ConsoleEvent::Command(cmd) = console_response {
-            // get shell to execute the command
-            if let Ok(response) = self.shell.execute_message(&cmd, &mut self.hacksys) {
-                // some output in response
-                self.console_window.sync_response(&response);
-            }
-        }
+        // if let ConsoleEvent::Command(cmd) = console_response {
+        //     // get shell to execute the command
+        //     if let Ok(response) = self.shell.execute_message(&cmd, &mut self.hacksys) {
+        //         // some output in response
+        //         self.console_window.sync_response(&response);
+        //     }
+        // }
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
@@ -177,7 +184,21 @@ impl eframe::App for HackEgui {
                 self.running = !self.running;
             }
         });
-
+        let mut console_response: ConsoleEvent = ConsoleEvent::None;
+        egui::Window::new("Console Window")
+            .default_height(500.0)
+            .resizable(true)
+            .show(ctx, |ui| {
+                console_response = self.console_window.draw(ui);
+            });
+        if let ConsoleEvent::Command(cmd) = console_response {
+            // get shell to execute the command
+            if let Ok(response) = self.shell.execute_message(&cmd, &mut self.hacksys) {
+                // some output in response
+                self.console_window.write(&response);
+                self.console_window.prompt();
+            }
+        }
         egui::Window::new("ui debug")
             .default_height(500.0)
             .show(ctx, |ui| ctx.inspection_ui(ui));
@@ -196,7 +217,7 @@ impl eframe::App for HackEgui {
                 Ok(reason) => match reason {
                     StopReason::SysHalt => {
                         self.running = false;
-                        self.console_window.async_message("SysHalt hit");
+                        self.console_window.write("SysHalt hit");
                     }
                     StopReason::HardLoop => {
                         self.running = false;
@@ -205,8 +226,15 @@ impl eframe::App for HackEgui {
                     StopReason::RefreshUI => {
                         ctx.request_repaint();
                     }
+                    StopReason::BreakPoint => {
+                        self.running = false;
+                        let waw = self.hacksys.where_are_we(self.hacksys.engine.pc);
+                        self.console_window
+                            .write(&format!("Breakpoint hit at {:?}", waw));
+                    }
                     _ => {
                         self.running = false;
+                        self.console_window.write("Unknown stop reason");
                     }
                 },
                 Err(err) => {
