@@ -35,7 +35,7 @@ impl CpuWindow {
             ui.end_row();
             for i in 0..16 {
                 ui.label(format!("R{}: ", i));
-                ui.label(format!("0x{:04X}", hacksys.engine.get_ram(i).unwrap()));
+                ui.label(format!("0x{:04X}", hacksys.engine.ram[i]));
                 ui.end_row();
             }
         });

@@ -1,13 +1,10 @@
 use clap::{arg, Arg};
 use clap::{ArgGroup, Command};
 
-// Clap sub command syntax defintions
 pub fn syntax() -> Command {
-    // strip out usage
     const PARSER_TEMPLATE: &str = "\
         {all-args}
     ";
-    // strip out name/version
     const APPLET_TEMPLATE: &str = "\
         {about-with-newline}\n\
         {usage-heading}\n    {usage}\n\
@@ -15,7 +12,7 @@ pub fn syntax() -> Command {
         {all-args}{after-help}\
     ";
 
-    Command::new("db65")
+    Command::new("hackem")
         .multicall(true)
         .arg_required_else_help(true)
         .subcommand_required(true)
@@ -25,67 +22,35 @@ pub fn syntax() -> Command {
         .subcommand(
             Command::new("load_code")
                 .visible_alias("load")
-                .about("Load binary file")
+                .about("Load binary file (.hx or raw binary)")
                 .arg(Arg::new("file").required(true))
                 .arg_required_else_help(true)
-                .help_template(APPLET_TEMPLATE)
-                .after_help(
-                    "loads binary file into memory. 
- If there is a dbginfo file (.dbg), it will also load that,
- removing the need for load_dbginfo command",
-                ),
+                .help_template(APPLET_TEMPLATE),
         )
         .subcommand(
             Command::new("load_pdb")
                 .visible_alias("pdb")
-                .about("Load dbginfo file")
+                .about("Load debug info file (JSON)")
                 .arg(Arg::new("file").required(true))
                 .arg_required_else_help(true)
-                .help_template(APPLET_TEMPLATE),
-        )
-
-        .subcommand(
-            Command::new("run")
-                .about("Run code")
-                .arg(Arg::new("address"))
-                .arg(Arg::new("args").last(true).num_args(0..))
-                .help_template(APPLET_TEMPLATE),
-        )
-        .subcommand(
-            Command::new("list_source")
-                .visible_alias("lsc")
-                .arg(arg!([address] "address to list from"))
-                .about("list source")
                 .help_template(APPLET_TEMPLATE),
         )
         .subcommand(
             Command::new("quit")
                 .visible_aliases(["exit", "q"])
-                .about("Quit db65")
+                .about("Quit")
                 .help_template(APPLET_TEMPLATE),
         )
         .subcommand(
             Command::new("next_instruction")
                 .visible_alias("ni")
-                .about("Next instruction (step over)")
+                .about("Step one instruction")
                 .help_template(APPLET_TEMPLATE),
         )
         .subcommand(
             Command::new("step_instruction")
                 .visible_alias("si")
-                .about("Next instruction (step into)")
-                .help_template(APPLET_TEMPLATE),
-        )
-        .subcommand(
-            Command::new("next_statement")
-                .visible_alias("ns")
-                .about("next statement")
-                .help_template(APPLET_TEMPLATE),
-        )
-        .subcommand(
-            Command::new("step_statement")
-                .visible_alias("ss")
-                .about("step statement")
+                .about("Step one instruction (alias of ni)")
                 .help_template(APPLET_TEMPLATE),
         )
         .subcommand(
@@ -95,186 +60,123 @@ pub fn syntax() -> Command {
                 .help_template(APPLET_TEMPLATE),
         )
         .subcommand(
-            Command::new("finish")
-                .visible_alias("fin")
-                .about("Run until current function returns")
-                .help_template(APPLET_TEMPLATE),
-        )
-        .subcommand(
             Command::new("break")
-                .about("Set break point")
+                .about("Set breakpoint")
                 .visible_alias("b")
                 .arg(Arg::new("address").required(true))
                 .help_template(APPLET_TEMPLATE),
         )
         .subcommand(
             Command::new("watch")
-                .about("Set watch points")
+                .about("Set watchpoint")
                 .visible_alias("w")
                 .arg(Arg::new("address").required(true))
-                .arg(arg!(-r --read  "watch for read"))
-                .arg(arg!(-w --write  "watch for write"))
+                .arg(arg!(-r --read   "watch for reads"))
+                .arg(arg!(-w --write  "watch for writes"))
                 .help_template(APPLET_TEMPLATE),
         )
         .subcommand(
             Command::new("list_breakpoints")
-                .about("List break points")
-                .alias("lbp")
-                .help_template(APPLET_TEMPLATE),
-        )
-        .subcommand(
-            Command::new("list_watchpoints")
-                .about("List watch points")
-                .alias("lwp")
+                .about("List breakpoints")
+                .visible_alias("lbp")
                 .help_template(APPLET_TEMPLATE),
         )
         .subcommand(
             Command::new("delete_breakpoint")
                 .visible_alias("dbp")
-                .arg(Arg::new("id").required(false))
-                .about("Delete breakpoint")
+                .arg(Arg::new("address").required(false))
+                .about("Delete breakpoint (omit address to delete all)")
+                .help_template(APPLET_TEMPLATE),
+        )
+        .subcommand(
+            Command::new("list_watchpoints")
+                .about("List watchpoints")
+                .visible_alias("lwp")
                 .help_template(APPLET_TEMPLATE),
         )
         .subcommand(
             Command::new("delete_watchpoint")
                 .visible_alias("dwp")
-                .arg(Arg::new("id").required(false))
-                .about("Delete watchpoint")
+                .arg(Arg::new("address").required(false))
+                .about("Delete watchpoint (omit address to delete all)")
                 .help_template(APPLET_TEMPLATE),
         )
         .subcommand(
             Command::new("dis")
-                .about("Disassemble")
-                .arg(Arg::new("address"))
+                .about("Disassemble instructions")
+                .arg(Arg::new("address").help("Start address (default: PC)"))
+                .arg(
+                    Arg::new("count")
+                        .short('n')
+                        .long("count")
+                        .value_parser(clap::value_parser!(u16))
+                        .default_value("16")
+                        .help("Number of instructions"),
+                )
                 .help_template(APPLET_TEMPLATE),
         )
         .subcommand(
             Command::new("display_memory")
                 .visible_aliases(["mem", "m"])
-                .about("Display memory")
+                .about("Display RAM as hex")
                 .arg(Arg::new("address").required(true))
+                .arg(
+                    Arg::new("count")
+                        .short('n')
+                        .long("count")
+                        .value_parser(clap::value_parser!(u16))
+                        .default_value("16")
+                        .help("Number of words"),
+                )
                 .help_template(APPLET_TEMPLATE),
         )
-        .subcommand(
-            Command::new("display_heap")
-                .visible_aliases(["heap"])
-                .about("Display heap")
-           
-                .help_template(APPLET_TEMPLATE),
-        )
-        .subcommand(
-            Command::new("back_trace")
-                .alias("bt")
-                .about("Display call stack")
-                .help_template(APPLET_TEMPLATE),
-        )
-
         .subcommand(
             Command::new("print")
                 .visible_alias("p")
-                .arg(arg!(<address>  "address of value to print"))
-                .arg(arg!(asint:     -i   "integer"))
-                .arg(arg!(aspointer: -p   "pointer"))
-                .arg(arg!(asstring:  -s   "string"))
-                .group(
-                    ArgGroup::new("format").args(["asint", "aspointer", "asstring"]), //.required(true), // default to int
-                )
-                .about("Formatted display of memory")
+                .arg(arg!(<address> "address of value to print"))
+                .arg(arg!(asint:     -i "integer"))
+                .arg(arg!(asstring:  -s "string"))
+                .group(ArgGroup::new("format").args(["asint", "asstring"]))
+                .about("Formatted display of a memory value")
+                .help_template(APPLET_TEMPLATE),
+        )
+        .subcommand(
+            Command::new("reg")
+                .about("Display CPU registers")
+                .help_template(APPLET_TEMPLATE),
+        )
+        .subcommand(
+            Command::new("write_memory")
+                .visible_alias("wm")
+                .about("Write a value to RAM")
+                .arg(arg!(<address> "address to write to"))
+                .arg(arg!(<value>   "value (integer or expression)"))
                 .help_template(APPLET_TEMPLATE),
         )
         .subcommand(
             Command::new("list_symbols")
                 .visible_alias("lsy")
                 .arg(Arg::new("match").required(false))
-                .about("List symbols")
-                .help_template(APPLET_TEMPLATE)
-                .long_about(
-                    "List symbols matching match. If match is omitted, all symbols are listed.
-Match is a substring, eg 'lsy main' will list all symbols containing 'main'",
-                ),
-        )
-
-
-        .subcommand(
-            Command::new("reg")
-                .about("Set register value")
-                .arg(arg!(<register> "register to set (ac,zr,yr,sp,pc,sr"))
-                .arg(arg!(<value> "value, either integer or expression"))
-                .help_template(APPLET_TEMPLATE),
-        )
-        .subcommand(
-            Command::new("write_memory")
-                .visible_alias("wm")
-                .about("Write to memory")
-                .arg(arg!(<address> "address to write to"))
-                .arg(arg!(<value> "value, either integer or expression"))
-                .help_template(APPLET_TEMPLATE),
-        )
-        .subcommand(
-            Command::new("dbginfo")
-                .about("display various debug data")
-                .arg(arg!(-s --segments "display segments"))
-                .arg(arg!(-g --segment <segment> "display specific segment"))
-                .arg(arg!(-a --address_map  "display c source address map"))
-              
+                .about("List PDB symbols (optional substring filter)")
                 .help_template(APPLET_TEMPLATE),
         )
         .subcommand(
             Command::new("expr")
-                .arg(arg!(<expression>  "expression to evaluate"))
-                .about("Evaluate address expression")
-                .help_template(APPLET_TEMPLATE),
-        )
-        .subcommand(
-            Command::new("about")
-                .about("explanation of commands")
-                .arg(arg!([topic]))
-                .help_template(APPLET_TEMPLATE),
-        )
-        .subcommand(
-            Command::new("settings")
-                .about("change various settings")
-                .alias("set")
-                .arg(arg!(source_tree: -s --source_tree <path> "cc65 source tree")
-                    .value_parser(clap::builder::PathBufValueParser::new()))
-                .arg(
-                    arg!(lines: -l --lines <number> "number of lines to list (dis, lsc)")
-                        .value_parser(clap::value_parser!(u8).range(1..)),
-                )
-                .arg(
-                    arg!(source_mode: -m --source_mode <switch> "Source mode ")
-                    .value_parser(clap::builder::PossibleValuesParser::new(["c", "asm", "raw"])),
-                )
-                .arg(
-                    arg!(regdis: -r --registers <switch> "display registers always")
-                    .value_parser(clap::builder::BoolishValueParser::new()),
-                )
-                .arg(
-                    arg!(dbgfile: -g --dbgfile_suffix <suffix> "File suffix for auto load of dbginfo files")
-                    .value_parser(clap::builder::StringValueParser::new()),
-                )
-                .arg(
-                    arg!(traps: -t --traps <switch> "Turn traps on or off ")
-                        .value_parser(clap::builder::BoolishValueParser::new()),
-                )
-                .arg(
-                    arg!(verbose: -v --verbose <switch> "Turn verbose messages on or off ")
-                        .value_parser(clap::builder::BoolishValueParser::new()),
-                )
-                .after_help("'switch' means, 'on'/'true'/'yes' or 'off'/'false'/'no'")
+                .arg(arg!(<expression> "expression to evaluate"))
+                .about("Evaluate an address expression")
                 .help_template(APPLET_TEMPLATE),
         )
         .subcommand(
             Command::new("cd")
-                .about("change current dir")
+                .about("Change working directory")
                 .arg(Arg::new("directory").required(true))
                 .arg_required_else_help(true)
                 .help_template(APPLET_TEMPLATE),
         )
         .subcommand(
-            Command::new("list")
-                .about("list")
-                .arg(arg!(<address> "address to write to"))
+            Command::new("about")
+                .about("Help for commands")
+                .arg(arg!([topic]))
                 .help_template(APPLET_TEMPLATE),
         )
 }

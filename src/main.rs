@@ -6,9 +6,10 @@ mod utils;
 // the egui ui
 mod ui {
     pub mod widgets {
-        // pub mod console;
+        pub mod code;
+        // pub mod console; -- replaced by egui_console crate
         pub mod cpu;
-        pub mod files;
+        pub mod data;
         pub mod screen;
     }
     pub mod app;

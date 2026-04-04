@@ -4,7 +4,7 @@ use egui::{
     text::CCursorRange, Align, Context, Event, EventFilter, Id, Key, Modifiers, TextEdit, Ui,
 };
 
-use crate::{debugger::debug_em::HackSystem, ui::app::UpdateType};
+use crate::debugger::debug_em::HackSystem;
 pub enum ConsoleEvent {
     Command(String),
     CtrlC,
@@ -112,7 +112,6 @@ impl ConsoleWindow {
         cursor: usize,
     ) -> (bool, Option<String>) {
         let mut eatit = false;
-        println!("Console focus: handle key: {:?} {:?}", modifiers, key);
         let return_value = match (modifiers, key) {
             (Modifiers::NONE, Key::ArrowDown) => {
                 let last = self.get_last_line();
@@ -143,7 +142,6 @@ impl ConsoleWindow {
             }
             (Modifiers::NONE, Key::Enter) => {
                 let last = self.get_last_line().to_string();
-                println!("command: {}", last);
                 self.history_cursor = self.command_history.len() as isize;
                 self.command_history.push(last.clone());
 
@@ -263,7 +261,6 @@ impl ConsoleWindow {
 
         // consume the keys we didnt use
         for (modifiers, key) in kill_list {
-            println!("Console focus: consume key: {:?} {:?}", modifiers, key);
             Self::consume_key(ctx, modifiers, key);
         }
 

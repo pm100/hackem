@@ -1,40 +1,32 @@
 use crate::{
     debugger::{debug_em::HackSystem, shell::Shell},
     emulator::engine::StopReason,
-    ui::key_lookup::lookup_key,
 };
 
-use egui::Id;
-
-use super::widgets::{
-    // console::{ConsoleEvent, ConsoleWindow},
-    cpu::CpuWindow,
-    files::FilesWindow,
-    screen::ScreenWindow,
-};
 use egui_console::{ConsoleBuilder, ConsoleEvent, ConsoleWindow};
 use thiserror::Error;
 use web_time::Duration;
-/// We derive Deserialize/Serialize so we can persist app state on shutdown.
-//#[derive(serde::Deserialize, serde::Serialize)]
-//#[serde(default)] // if we add new fields, give them default values when deserializing old state
+
+use super::widgets::{
+    code::CodeWindow,
+    cpu::CpuWindow,
+    data::DataWindow,
+    screen::ScreenWindow,
+};
+
 pub struct HackEgui {
-    //  #[serde(skip)]
     pub(crate) hacksys: HackSystem,
-    // #[serde(skip)]
     running: bool,
-    //#[serde(skip)]
-    elapsed: Duration,
-    text: String,
-    console: String,
-    // pub windows: Vec<Box<dyn AppWindow>>,
     console_window: ConsoleWindow,
     console_window_open: bool,
     screen_window: ScreenWindow,
     cpu_window: CpuWindow,
-    files_window: FilesWindow,
+    code_window: CodeWindow,
+    data_window1: DataWindow,
+    data_window2: DataWindow,
     shell: Shell,
 }
+
 #[derive(Debug, Error, PartialEq)]
 pub enum RuntimeError {
     #[error("Invalid instruction")]
@@ -47,111 +39,90 @@ pub enum RuntimeError {
     InvalidPC(u16),
 }
 
-// pub enum AppMessage {
-//     LoadBinary(String),
-//     ConsoleCommand(String),
-//     Quit,
-//     None,
-// }
-pub struct UpdateMessage {
-    pub message: UpdateType,
-    //pub widget: Id,
-}
-pub enum UpdateType {
-    Text(String),
-}
-
 impl HackEgui {
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        // This is also where you can customize the look and feel of egui using
-        // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
+        egui_extras::install_image_loaders(&cc.egui_ctx);
 
-        // Load previous app state (if any).
-        // Note that you must enable the `persistence` feature for this to work.
-        // if let Some(storage) = cc.storage {
-        //     return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
-        // }
-
-        let mut ret = Self {
+        let ret = Self {
             hacksys: HackSystem::new(),
             running: false,
-            elapsed: Duration::from_secs(0),
-            text: String::new(),
-            console: String::new(),
-
             console_window: ConsoleBuilder::new()
                 .prompt(">> ")
                 .history_size(20)
                 .tab_quote_character('\"')
                 .build(),
-            console_window_open: false,
+            console_window_open: true,
             screen_window: ScreenWindow::new(),
             cpu_window: CpuWindow::new(),
-            files_window: FilesWindow::new(),
-
+            code_window: CodeWindow::new(),
+            data_window1: DataWindow::new("Data 1"),
+            data_window2: DataWindow::new("Data 2"),
             shell: Shell::new(),
         };
-        ret.once(&cc.egui_ctx);
         ret
     }
-    fn save_history(&self) {
-        if cfg!(target_arch = "wasm32") {
-        } else {
-            if let Some(home) = dirs::home_dir() {
-                let history_path = home.join(".hackem_history");
 
-                let history = Vec::from(self.console_window.get_history());
-                std::fs::write(history_path, history.join("\n")).unwrap();
-            }
+    fn save_history(&self) {
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(home) = dirs::home_dir() {
+            let history_path = home.join(".hackem_history");
+            let history: Vec<String> = self.console_window.get_history().into_iter().collect();
+            let _ = std::fs::write(history_path, history.join("\n"));
         }
     }
-    fn once(&mut self, ctx: &egui::Context) {
-        // boot up stuff
-        if cfg!(target_arch = "wasm32") {
-        } else {
-            if let Some(home) = dirs::home_dir() {
-                let history_path = home.join(".hackem_history");
-                if let Ok(history) = std::fs::read_to_string(history_path) {
-                    self.console_window.load_history(history.lines());
-                }
-            }
-        }
-        self.console_window_open = true;
-        egui_extras::install_image_loaders(ctx);
+
+    fn console_write(&mut self, msg: &str) {
+        self.console_window.write(msg);
+        self.console_window.prompt();
     }
 }
 
 impl eframe::App for HackEgui {
-    /// Called by the frame work to save state before shutdown.
-    fn save(&mut self, _storage: &mut dyn eframe::Storage) {
-        //  eframe::set_value(storage, eframe::APP_KEY, self);
-    }
+    fn save(&mut self, _storage: &mut dyn eframe::Storage) {}
 
-    /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Put your widgets into a `SidePanel`, `TopBottomPanel`, `CentralPanel`, `Window` or `Area`.
-        // For inspiration and more examples, go to https://emilk.github.io/egui
         let mut open = true;
 
-        // draw all our windows
-
-        // let console_response = self.console_window.draw(ctx);
+        // Draw non-console windows
         self.screen_window.draw(ctx, &mut open, &self.hacksys);
         self.cpu_window.draw(ctx, &mut open, &self.hacksys);
-        self.files_window.draw(ctx, &mut open, &self.hacksys);
+        self.code_window.draw(ctx, &mut open, &mut self.hacksys);
+        self.data_window1.draw(ctx, &mut open, &self.hacksys);
+        self.data_window2.draw(ctx, &mut open, &self.hacksys);
 
-        // if let ConsoleEvent::Command(cmd) = console_response {
-        //     // get shell to execute the command
-        //     if let Ok(response) = self.shell.execute_message(&cmd, &mut self.hacksys) {
-        //         // some output in response
-        //         self.console_window.sync_response(&response);
-        //     }
-        // }
+        // Console window using egui_console
+        let mut console_response: ConsoleEvent = ConsoleEvent::None;
+        egui::Window::new("Console")
+            .default_height(500.0)
+            .resizable(true)
+            .open(&mut self.console_window_open)
+            .show(ctx, |ui| {
+                console_response = self.console_window.draw(ui);
+            });
+
+        if let ConsoleEvent::Command(cmd) = console_response {
+            if let Ok(response) = self.shell.execute_message(&cmd, &mut self.hacksys) {
+                match response.as_str() {
+                    "__go__" => {
+                        self.running = true;
+                    }
+                    "__quit__" => {
+                        self.save_history();
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    }
+                    _ => {
+                        if !response.is_empty() {
+                            self.console_write(&response);
+                        } else {
+                            self.console_window.prompt();
+                        }
+                    }
+                }
+            }
+        }
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            // The top panel is often a good place for a menu bar:
-
             egui::menu::bar(ui, |ui| {
                 #[cfg(target_arch = "wasm32")]
                 self.wasm_update_and_menu(ui);
@@ -162,7 +133,7 @@ impl eframe::App for HackEgui {
                             rfd::FileDialog::new().add_filter("x", &["hx"]).pick_file()
                         {
                             let bin = std::fs::read_to_string(path).unwrap();
-                            let _ignore_for_now = self.hacksys.engine.load_file(&bin);
+                            let _ignore = self.hacksys.engine.load_file(&bin);
                         }
                         ui.close_menu();
                     }
@@ -173,75 +144,63 @@ impl eframe::App for HackEgui {
                     }
                 });
                 ui.add_space(16.0);
-
                 egui::widgets::global_dark_light_mode_buttons(ui);
-            });
-            if ui.button("Step").clicked() {
-                let _ = self.hacksys.engine.execute_instructions(Duration::ZERO);
-            }
 
-            if ui.button("Run").clicked() {
+                if ui.button("Console").clicked() {
+                    self.console_window_open = true;
+                }
+            });
+
+            ui.add_enabled_ui(!self.running, |ui| {
+                if ui.button("Step").clicked() {
+                    let _ = self.hacksys.engine.execute_instructions(Duration::ZERO);
+                }
+            });
+
+            let run_label = if self.running { "Pause" } else { "Run" };
+            if ui.button(run_label).clicked() {
                 self.running = !self.running;
             }
         });
-        let mut console_response: ConsoleEvent = ConsoleEvent::None;
-        egui::Window::new("Console Window")
-            .default_height(500.0)
-            .resizable(true)
-            .show(ctx, |ui| {
-                console_response = self.console_window.draw(ui);
-            });
-        if let ConsoleEvent::Command(cmd) = console_response {
-            // get shell to execute the command
-            if let Ok(response) = self.shell.execute_message(&cmd, &mut self.hacksys) {
-                // some output in response
-                self.console_window.write(&response);
-                self.console_window.prompt();
-            }
-        }
-        egui::Window::new("ui debug")
-            .default_height(500.0)
-            .show(ctx, |ui| ctx.inspection_ui(ui));
 
-        // run instructions until we hit a stop condition
-        // - time out after the supliied number of ms draw next screen frame)
-        // - Sys.halt or hard loop detected
-        // - an error occurs
         if self.running {
+            let pc = self.hacksys.engine.pc;
             let stop = self
                 .hacksys
                 .engine
                 .execute_instructions(Duration::from_millis(50));
-            // println!("{:?}", stop);
             match stop {
                 Ok(reason) => match reason {
                     StopReason::SysHalt => {
                         self.running = false;
-                        self.console_window.write("SysHalt hit");
+                        self.console_write("SysHalt");
                     }
                     StopReason::HardLoop => {
                         self.running = false;
-                    }
-
-                    StopReason::RefreshUI => {
-                        ctx.request_repaint();
+                        self.console_write(&format!("Hard loop at 0x{:04X}", pc));
                     }
                     StopReason::BreakPoint => {
                         self.running = false;
-                        let waw = self.hacksys.where_are_we(self.hacksys.engine.pc);
-                        self.console_window
-                            .write(&format!("Breakpoint hit at {:?}", waw));
+                        self.console_write(&format!(
+                            "Breakpoint hit at 0x{:04X}",
+                            self.hacksys.engine.pc
+                        ));
                     }
-                    _ => {
+                    StopReason::WatchPoint => {
                         self.running = false;
-                        self.console_window.write("Unknown stop reason");
+                        let addr = self.hacksys.engine.triggered_watchpoint.unwrap_or(0);
+                        self.console_write(&format!("Watchpoint hit at 0x{:04X}", addr));
+                    }
+                    StopReason::RefreshUI => {
+                        ctx.request_repaint();
                     }
                 },
                 Err(err) => {
                     self.running = false;
-                    log::error!("Error: {}", err);
+                    self.console_write(&format!("Error: {}", err));
                 }
             }
-        };
+        }
     }
 }
+

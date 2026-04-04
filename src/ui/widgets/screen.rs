@@ -26,12 +26,11 @@ impl ScreenWindow {
         };
         let draw_area_size =
             Vec2::new(SCREEN_WIDTH as f32, SCREEN_HEIGHT as f32) + Vec2::splat(1.0);
-        let sense = Sense::click(); // Sense::focusable_noninteractive();
+        let sense = Sense::click();
         let (response, painter) = ui.allocate_painter(draw_area_size, sense);
         self.paint_id = response.id;
         if response.clicked() {
             response.request_focus();
-            println!("xccc{:?}", response.id);
         }
 
         let top_left = Pos2::new(response.rect.min.x * 1.0, response.rect.min.y * 1.0).ceil();
@@ -67,26 +66,16 @@ impl ScreenWindow {
             ctx.input(|inp| {
                 // println!("xx{:?}", inp);
                 if !inp.keys_down.is_empty() {
-                    println!(
-                        "{:?} {:?} {} ",
-                        inp.keys_down,
-                        inp.modifiers,
-                        inp.keys_down.len()
-                    );
                     lookup_key(inp);
-                    println!("xkey: {}", unsafe { CURRENT_KEY as char });
                 } else {
                     unsafe {
                         CURRENT_KEY = 0;
                     }
                 }
                 if let Some(egui::Event::Text(text)) = inp.events.first() {
-                    // if let egui::Event::Text(text) = ev {
-                    println!("Text {:?}", text);
                     unsafe {
                         CURRENT_KEY = text.chars().next().unwrap() as u8;
                     }
-                    //}
                 }
             });
         };

@@ -1,14 +1,22 @@
 use std::collections::BTreeMap;
 
-use crate::{trace, ui::app::RuntimeError};
+use crate::ui::app::RuntimeError;
 
 use crate::ui::widgets::screen::CURRENT_KEY;
 use anyhow::{bail, Result};
 use web_time::{Duration, Instant};
-struct BreakPoint {
-    address: u16,
-    enabled: bool,
+pub(crate) struct BreakPoint {
+    pub address: u16,
+    pub enabled: bool,
 }
+
+pub struct WatchPoint {
+    pub address: u16,
+    pub read: bool,
+    pub write: bool,
+    pub enabled: bool,
+}
+
 pub struct HackEngine {
     pub pc: u16,
     pub a: u16,
@@ -19,6 +27,8 @@ pub struct HackEngine {
     pub speed: f32,
     inst_count: u64,
     pub break_points: BTreeMap<u16, BreakPoint>,
+    pub watch_points: BTreeMap<u16, WatchPoint>,
+    pub triggered_watchpoint: Option<u16>,
 }
 #[derive(Debug, PartialEq)]
 pub(crate) enum StopReason {
@@ -46,6 +56,8 @@ impl HackEngine {
             speed: 0.0,
             inst_count: 0,
             break_points: BTreeMap::new(),
+            watch_points: BTreeMap::new(),
+            triggered_watchpoint: None,
         }
     }
     fn alu(x_in: u16, y_in: u16, c: u16) -> u16 {
@@ -86,30 +98,34 @@ impl HackEngine {
             }
             0x4000..=0x5fff => {
                 // screen
-                let _old = self.ram[address as usize];
                 self.ram[address as usize] = value;
             }
             0x6000 => {
-                // keyboard - meaningless here
-                self.ram[address as usize] = value;
+                // keyboard - write ignored
             }
             _ => {
                 self.ram[address as usize] = value;
             }
         }
+        if let Some(wp) = self.watch_points.get(&address) {
+            if wp.write && wp.enabled {
+                self.triggered_watchpoint = Some(address);
+            }
+        }
         Ok(())
     }
-    pub fn get_ram(&self, address: u16) -> Result<u16> {
+    pub fn get_ram(&mut self, address: u16) -> Result<u16> {
         if address >= 0x8000 {
-            //    println!("Invalid address {:04x} at {:04x}", address, self.pc);
             bail!(RuntimeError::InvalidReadAddress(address));
         }
         if address == 0x6000 {
-            // keyboard
-            // read from keyboard
             unsafe {
-                //  println!("Current key: {}", CURRENT_KEY as u16);
                 return Ok(CURRENT_KEY as u16);
+            }
+        }
+        if let Some(wp) = self.watch_points.get(&address) {
+            if wp.read && wp.enabled {
+                self.triggered_watchpoint = Some(address);
             }
         }
         Ok(self.ram[address as usize])
@@ -232,6 +248,9 @@ impl HackEngine {
                     return Ok(StopReason::BreakPoint);
                 }
             }
+            if self.triggered_watchpoint.take().is_some() {
+                return Ok(StopReason::WatchPoint);
+            }
             if run_time == Duration::ZERO {
                 return Ok(StopReason::RefreshUI);
             }
@@ -242,11 +261,128 @@ impl HackEngine {
     }
 
     pub fn add_breakpoint(&mut self, address: u16) {
-        let bp = BreakPoint {
-            address,
-            enabled: true,
+        self.break_points.insert(address, BreakPoint { address, enabled: true });
+    }
+
+    pub fn remove_breakpoint(&mut self, address: u16) {
+        self.break_points.remove(&address);
+    }
+
+    pub fn remove_all_breakpoints(&mut self) {
+        self.break_points.clear();
+    }
+
+    pub fn add_watchpoint(&mut self, address: u16, read: bool, write: bool) {
+        self.watch_points.insert(address, WatchPoint { address, read, write, enabled: true });
+    }
+
+    pub fn remove_watchpoint(&mut self, address: u16) {
+        self.watch_points.remove(&address);
+    }
+
+    pub fn remove_all_watchpoints(&mut self) {
+        self.watch_points.clear();
+    }
+
+    /// Disassemble a single 16-bit Hack instruction word into a mnemonic string.
+    pub fn disassemble_one(word: u16) -> String {
+        if word >> 15 == 0 {
+            // A-instruction: @value
+            return format!("@{}", word & 0x7FFF);
+        }
+
+        // C-instruction: dest=comp;jump
+        let a_bit = (word >> 12) & 0x1;
+        let comp  = (word >> 6)  & 0x3F;
+        let dest  = (word >> 3)  & 0x7;
+        let jump  =  word        & 0x7;
+
+        let comp_str = if a_bit == 0 {
+            match comp {
+                0b101010 => "0",
+                0b111111 => "1",
+                0b111010 => "-1",
+                0b001100 => "D",
+                0b110000 => "A",
+                0b001101 => "!D",
+                0b110001 => "!A",
+                0b001111 => "-D",
+                0b110011 => "-A",
+                0b011111 => "D+1",
+                0b110111 => "A+1",
+                0b001110 => "D-1",
+                0b110010 => "A-1",
+                0b000010 => "D+A",
+                0b010011 => "D-A",
+                0b000111 => "A-D",
+                0b000000 => "D&A",
+                0b010101 => "D|A",
+                _ => "???",
+            }
+        } else {
+            match comp {
+                0b101010 => "0",
+                0b111111 => "1",
+                0b111010 => "-1",
+                0b001100 => "D",
+                0b110000 => "M",
+                0b001101 => "!D",
+                0b110001 => "!M",
+                0b001111 => "-D",
+                0b110011 => "-M",
+                0b011111 => "D+1",
+                0b110111 => "M+1",
+                0b001110 => "D-1",
+                0b110010 => "M-1",
+                0b000010 => "D+M",
+                0b010011 => "D-M",
+                0b000111 => "M-D",
+                0b000000 => "D&M",
+                0b010101 => "D|M",
+                _ => "???",
+            }
         };
-        self.break_points.insert(address, bp);
+
+        let dest_str = match dest {
+            0b000 => "",
+            0b001 => "M=",
+            0b010 => "D=",
+            0b011 => "MD=",
+            0b100 => "A=",
+            0b101 => "AM=",
+            0b110 => "AD=",
+            0b111 => "AMD=",
+            _ => unreachable!(),
+        };
+
+        let jump_str = match jump {
+            0b000 => "",
+            0b001 => ";JGT",
+            0b010 => ";JEQ",
+            0b011 => ";JGE",
+            0b100 => ";JLT",
+            0b101 => ";JNE",
+            0b110 => ";JLE",
+            0b111 => ";JMP",
+            _ => unreachable!(),
+        };
+
+        format!("{}{}{}", dest_str, comp_str, jump_str)
+    }
+
+    /// Disassemble `count` instructions starting at `start` address.
+    /// Returns (address, raw_word, mnemonic) for each instruction.
+    pub fn disassemble_range(&self, start: u16, count: u16) -> Vec<(u16, u16, String)> {
+        let mut result = Vec::with_capacity(count as usize);
+        for i in 0..count {
+            let addr = start.wrapping_add(i);
+            if addr as usize >= self.rom.len() {
+                break;
+            }
+            let word = self.rom[addr as usize];
+            result.push((addr, word, Self::disassemble_one(word)));
+        }
+        result
     }
 }
 #[macro_export]
