@@ -54,9 +54,14 @@ impl CodeWindow {
                         }
 
                         // Address
-                        let addr_text = RichText::new(format!("{:04X}", addr))
-                            .monospace()
-                            .color(if at_pc { Color32::YELLOW } else { Color32::GRAY });
+                        let addr_text =
+                            RichText::new(format!("{:04X}", addr))
+                                .monospace()
+                                .color(if at_pc {
+                                    Color32::YELLOW
+                                } else {
+                                    Color32::GRAY
+                                });
                         ui.label(addr_text);
 
                         // Raw hex
@@ -67,7 +72,11 @@ impl CodeWindow {
                         );
 
                         // Mnemonic
-                        let mn_color = if at_pc { Color32::WHITE } else { Color32::LIGHT_GRAY };
+                        let mn_color = if at_pc {
+                            Color32::WHITE
+                        } else {
+                            Color32::LIGHT_GRAY
+                        };
                         ui.label(RichText::new(mnemonic).monospace().color(mn_color));
 
                         ui.end_row();

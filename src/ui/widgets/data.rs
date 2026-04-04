@@ -31,7 +31,8 @@ impl DataWindow {
             );
             if resp.lost_focus() {
                 let s = self.start_addr_text.trim();
-                let parsed = if let Some(hex) = s.strip_prefix("0x").or_else(|| s.strip_prefix("$")) {
+                let parsed = if let Some(hex) = s.strip_prefix("0x").or_else(|| s.strip_prefix("$"))
+                {
                     u16::from_str_radix(hex, 16).ok()
                 } else {
                     s.parse::<u16>().ok()

@@ -109,7 +109,11 @@ impl Shell {
                 let addr = self.resolve_addr(raw, hacksys)?;
                 let read = args.get_flag("read");
                 let write = args.get_flag("write");
-                let (r, w) = if !read && !write { (true, true) } else { (read, write) };
+                let (r, w) = if !read && !write {
+                    (true, true)
+                } else {
+                    (read, write)
+                };
                 hacksys.engine.add_watchpoint(addr, r, w);
                 Ok(format!(
                     "Watchpoint set at 0x{:04X} ({}{})",
@@ -155,7 +159,11 @@ impl Shell {
                 let lines = hacksys.engine.disassemble_range(start, count);
                 let mut out = String::new();
                 for (addr, raw, mnemonic) in lines {
-                    let bp = if hacksys.engine.break_points.contains_key(&addr) { "*" } else { " " };
+                    let bp = if hacksys.engine.break_points.contains_key(&addr) {
+                        "*"
+                    } else {
+                        " "
+                    };
                     let pc = if addr == hacksys.engine.pc { ">" } else { " " };
                     out.push_str(&format!(
                         "{}{} {:04X}  {:04X}  {}\n",

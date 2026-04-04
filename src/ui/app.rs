@@ -7,12 +7,7 @@ use egui_console::{ConsoleBuilder, ConsoleEvent, ConsoleWindow};
 use thiserror::Error;
 use web_time::Duration;
 
-use super::widgets::{
-    code::CodeWindow,
-    cpu::CpuWindow,
-    data::DataWindow,
-    screen::ScreenWindow,
-};
+use super::widgets::{code::CodeWindow, cpu::CpuWindow, data::DataWindow, screen::ScreenWindow};
 
 pub struct HackEgui {
     pub(crate) hacksys: HackSystem,
@@ -44,7 +39,7 @@ impl HackEgui {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         egui_extras::install_image_loaders(&cc.egui_ctx);
 
-        let ret = Self {
+        Self {
             hacksys: HackSystem::new(),
             running: false,
             console_window: ConsoleBuilder::new()
@@ -59,8 +54,7 @@ impl HackEgui {
             data_window1: DataWindow::new("Data 1"),
             data_window2: DataWindow::new("Data 2"),
             shell: Shell::new(),
-        };
-        ret
+        }
     }
 
     fn save_history(&self) {
@@ -203,4 +197,3 @@ impl eframe::App for HackEgui {
         }
     }
 }
-

@@ -1,10 +1,6 @@
 pub struct Disassembler {}
 
 impl Disassembler {
-    pub fn new() -> Self {
-        Self {}
-    }
-
     pub fn disassemble(instruction: u16) -> String {
         let opcode = instruction >> 15;
         match opcode {

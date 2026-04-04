@@ -6,12 +6,10 @@ use crate::ui::widgets::screen::CURRENT_KEY;
 use anyhow::{bail, Result};
 use web_time::{Duration, Instant};
 pub(crate) struct BreakPoint {
-    pub address: u16,
     pub enabled: bool,
 }
 
 pub struct WatchPoint {
-    pub address: u16,
     pub read: bool,
     pub write: bool,
     pub enabled: bool,
@@ -261,7 +259,8 @@ impl HackEngine {
     }
 
     pub fn add_breakpoint(&mut self, address: u16) {
-        self.break_points.insert(address, BreakPoint { address, enabled: true });
+        self.break_points
+            .insert(address, BreakPoint { enabled: true });
     }
 
     pub fn remove_breakpoint(&mut self, address: u16) {
@@ -273,7 +272,14 @@ impl HackEngine {
     }
 
     pub fn add_watchpoint(&mut self, address: u16, read: bool, write: bool) {
-        self.watch_points.insert(address, WatchPoint { address, read, write, enabled: true });
+        self.watch_points.insert(
+            address,
+            WatchPoint {
+                read,
+                write,
+                enabled: true,
+            },
+        );
     }
 
     pub fn remove_watchpoint(&mut self, address: u16) {
@@ -293,9 +299,9 @@ impl HackEngine {
 
         // C-instruction: dest=comp;jump
         let a_bit = (word >> 12) & 0x1;
-        let comp  = (word >> 6)  & 0x3F;
-        let dest  = (word >> 3)  & 0x7;
-        let jump  =  word        & 0x7;
+        let comp = (word >> 6) & 0x3F;
+        let dest = (word >> 3) & 0x7;
+        let jump = word & 0x7;
 
         let comp_str = if a_bit == 0 {
             match comp {

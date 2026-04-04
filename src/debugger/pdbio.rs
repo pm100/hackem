@@ -4,6 +4,7 @@ use super::debug_em::HackSystem;
 use anyhow::Result;
 use common::pdb::database::Symbol;
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct CodeLocation {
     pub module: Option<i32>,
     pub cfile: Option<usize>,
@@ -24,6 +25,7 @@ impl HackSystem {
             .collect())
     }
 
+    #[allow(dead_code)]
     pub fn where_are_we(&self, addr: u16) -> CodeLocation {
         if let Some(cl) = self.waw.range(..=addr).next_back() {
             cl.1.clone()
