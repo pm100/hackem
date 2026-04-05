@@ -1,9 +1,8 @@
-use egui::{Color32, Id, RichText, ScrollArea};
+use egui::{RichText, ScrollArea};
 
 use crate::debugger::debug_em::HackSystem;
 
 pub struct DataWindow {
-    id: Id,
     title: String,
     start_addr_text: String,
     start_addr: u16,
@@ -13,7 +12,6 @@ pub struct DataWindow {
 impl DataWindow {
     pub fn new(title: &str) -> Self {
         Self {
-            id: Id::new(title),
             title: title.to_string(),
             start_addr_text: "0".to_string(),
             start_addr: 0,
@@ -21,7 +19,10 @@ impl DataWindow {
         }
     }
 
-    fn ui(&mut self, ui: &mut egui::Ui, hacksys: &HackSystem) {
+    pub fn ui(&mut self, ui: &mut egui::Ui, hacksys: &HackSystem) {
+        let addr_color = ui.visuals().weak_text_color();
+        let val_color = ui.visuals().text_color();
+
         ui.horizontal(|ui| {
             ui.label("Address:");
             let resp = ui.add(
@@ -51,48 +52,38 @@ impl DataWindow {
         });
         ui.separator();
 
-        ScrollArea::vertical().show(ui, |ui| {
-            egui::Grid::new(format!("{}_grid", self.title))
-                .num_columns(9) // addr + 8 values
-                .spacing([4.0, 2.0])
-                .striped(true)
-                .show(ui, |ui| {
-                    for row in 0..self.row_count {
-                        let base = self.start_addr.wrapping_add(row * 8);
-                        ui.label(
-                            RichText::new(format!("{:04X}:", base))
-                                .monospace()
-                                .color(Color32::GRAY),
-                        );
-                        for col in 0..8u16 {
-                            let addr = base.wrapping_add(col);
-                            if addr as usize >= hacksys.engine.ram.len() {
-                                ui.label("----");
-                            } else {
-                                let val = hacksys.engine.ram[addr as usize];
-                                ui.label(
-                                    RichText::new(format!("{:04X}", val))
-                                        .monospace()
-                                        .color(Color32::LIGHT_GRAY),
-                                )
-                                .on_hover_text(format!("{} ({})", val, val as i16));
+        ScrollArea::vertical()
+            .id_source(&self.title)
+            .show(ui, |ui| {
+                egui::Grid::new(format!("{}_grid", self.title))
+                    .num_columns(9)
+                    .spacing([4.0, 2.0])
+                    .striped(true)
+                    .show(ui, |ui| {
+                        for row in 0..self.row_count {
+                            let base = self.start_addr.wrapping_add(row * 8);
+                            ui.label(
+                                RichText::new(format!("{:04X}:", base))
+                                    .monospace()
+                                    .color(addr_color),
+                            );
+                            for col in 0..8u16 {
+                                let addr = base.wrapping_add(col);
+                                if addr as usize >= hacksys.engine.ram.len() {
+                                    ui.label("----");
+                                } else {
+                                    let val = hacksys.engine.ram[addr as usize];
+                                    ui.label(
+                                        RichText::new(format!("{:04X}", val))
+                                            .monospace()
+                                            .color(val_color),
+                                    )
+                                    .on_hover_text(format!("{} ({})", val, val as i16));
+                                }
                             }
+                            ui.end_row();
                         }
-                        ui.end_row();
-                    }
-                });
-        });
-    }
-
-    pub fn draw(&mut self, ctx: &egui::Context, open: &mut bool, hacksys: &HackSystem) {
-        let title = self.title.clone();
-        egui::Window::new(title)
-            .id(self.id)
-            .open(open)
-            .default_width(380.0)
-            .default_height(300.0)
-            .show(ctx, |ui| {
-                self.ui(ui, hacksys);
+                    });
             });
     }
 }

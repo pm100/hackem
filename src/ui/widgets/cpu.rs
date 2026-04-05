@@ -1,5 +1,3 @@
-use egui::Id;
-
 use crate::debugger::debug_em::HackSystem;
 
 pub struct CpuWindow {}
@@ -8,8 +6,8 @@ impl CpuWindow {
     pub fn new() -> Self {
         Self {}
     }
-    fn ui(&self, ui: &mut egui::Ui, hacksys: &HackSystem) {
-        // let (pc, a, d) = self.hacksys.get_registers(
+
+    pub fn ui(&self, ui: &mut egui::Ui, hacksys: &HackSystem) {
         let (pc, a, d) = hacksys.engine.get_registers();
         egui::Grid::new("CPU Status").num_columns(2).show(ui, |ui| {
             ui.label("PC: ");
@@ -28,10 +26,6 @@ impl CpuWindow {
             } else {
                 ui.label("Stopped");
             }
-            // ui.label(format!("0x{:04X}", d));
-            ui.end_row();
-            ui.label("Elapsed: ");
-            //  ui.label(format!("{}", hacksys.elapsed.as_secs()));
             ui.end_row();
             for i in 0..16 {
                 ui.label(format!("R{}: ", i));
@@ -39,20 +33,5 @@ impl CpuWindow {
                 ui.end_row();
             }
         });
-    }
-
-    pub fn name(&self) -> &'static str {
-        "Cpu"
-    }
-
-    pub fn draw(&mut self, ctx: &egui::Context, open: &mut bool, hacksys: &HackSystem) {
-        egui::Window::new(self.name())
-            .id(Id::new(self.name()))
-            .open(open)
-            .default_height(600.0)
-            .show(ctx, |ui| {
-                self.ui(ui, hacksys);
-            });
-        //  None
     }
 }

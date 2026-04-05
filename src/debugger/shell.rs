@@ -53,7 +53,10 @@ impl Shell {
                 let file = args.get_one::<String>("file").unwrap();
                 let bin = std::fs::read_to_string(Path::new(file))?;
                 hacksys.engine.load_file(&bin)?;
-                Ok(format!("Loaded {}", file))
+                Ok(format!(
+                    "Loaded {}  ROM: {} words  RAM: {} words",
+                    file, hacksys.engine.rom_words_loaded, hacksys.engine.ram_words_loaded
+                ))
             }
             Some(("load_pdb", args)) => {
                 let file = args.get_one::<String>("file").unwrap();

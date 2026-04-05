@@ -37,6 +37,7 @@ macro_rules! verbose {
 
 use once_cell::sync::OnceCell;
 pub static SAY_CB: OnceCell<fn(&str, bool)> = OnceCell::new();
+#[allow(dead_code)]
 pub fn say_cb(s: &str, v: bool) {
     if let Some(cb) = SAY_CB.get() {
         cb(s, v);

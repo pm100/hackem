@@ -1,5 +1,7 @@
+#[allow(dead_code)]
 pub struct Disassembler {}
 
+#[allow(dead_code)]
 impl Disassembler {
     pub fn disassemble(instruction: u16) -> String {
         let opcode = instruction >> 15;

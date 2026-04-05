@@ -1,5 +1,3 @@
-use crate::{debugger::disassemble::Disassembler, say, utils};
-
 use super::engine::HackEngine;
 use anyhow::Result;
 
@@ -11,8 +9,10 @@ enum LoadTarget {
 
 impl HackEngine {
     pub fn load_file(&mut self, bin: &str) -> Result<()> {
-        // peek at first line
-        let mut address = 0;
+        let mut address = 0u16;
+        let mut rom_count = 0usize;
+        let mut ram_count = 0usize;
+
         if bin.starts_with("hackem") {
             let mut target = LoadTarget::None;
             for line in bin.lines() {
@@ -45,8 +45,14 @@ impl HackEngine {
                 } else {
                     let value = u16::from_str_radix(line, 16).unwrap();
                     match target {
-                        LoadTarget::Ram => self.ram[address as usize] = value,
-                        LoadTarget::Rom => self.rom[address as usize] = value,
+                        LoadTarget::Ram => {
+                            self.ram[address as usize] = value;
+                            ram_count += 1;
+                        }
+                        LoadTarget::Rom => {
+                            self.rom[address as usize] = value;
+                            rom_count += 1;
+                        }
                         LoadTarget::None => panic!("No target specified"),
                     }
                     address += 1;
@@ -64,14 +70,12 @@ impl HackEngine {
                 let value = u16::from_str_radix(line, 2).unwrap();
                 self.rom[address as usize] = value;
                 address += 1;
+                rom_count += 1;
             }
         }
-        say!("Loaded file");
-        for i in 0..100 {
-            let inst = self.rom[i as usize];
-            let inst_str = Disassembler::disassemble(inst);
-            say!("Code[{}] = {:04x} ({})", i, inst, inst_str);
-        }
+
+        self.rom_words_loaded = rom_count;
+        self.ram_words_loaded = ram_count;
         self.pc = 0;
         Ok(())
     }

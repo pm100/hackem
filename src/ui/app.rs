@@ -4,22 +4,88 @@ use crate::{
 };
 
 use egui_console::{ConsoleBuilder, ConsoleEvent, ConsoleWindow};
+use egui_dock::{DockArea, DockState, NodeIndex, Style, TabViewer};
 use thiserror::Error;
 use web_time::Duration;
 
 use super::widgets::{code::CodeWindow, cpu::CpuWindow, data::DataWindow, screen::ScreenWindow};
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum AppTab {
+    Console,
+    Code,
+    Cpu,
+    Data1,
+    Data2,
+    Screen,
+}
+
+impl std::fmt::Display for AppTab {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AppTab::Console => write!(f, "Console"),
+            AppTab::Code => write!(f, "Code"),
+            AppTab::Cpu => write!(f, "CPU"),
+            AppTab::Data1 => write!(f, "Data 1"),
+            AppTab::Data2 => write!(f, "Data 2"),
+            AppTab::Screen => write!(f, "Screen"),
+        }
+    }
+}
+
+struct AppTabViewer<'a> {
+    hacksys: &'a mut HackSystem,
+    console_window: &'a mut ConsoleWindow,
+    console_response: &'a mut ConsoleEvent,
+    code_window: &'a mut CodeWindow,
+    cpu_window: &'a mut CpuWindow,
+    data_window1: &'a mut DataWindow,
+    data_window2: &'a mut DataWindow,
+    screen_window: &'a mut ScreenWindow,
+}
+
+impl<'a> TabViewer for AppTabViewer<'a> {
+    type Tab = AppTab;
+
+    fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
+        format!("{}", tab).into()
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
+        match tab {
+            AppTab::Console => {
+                *self.console_response = self.console_window.draw(ui);
+            }
+            AppTab::Code => {
+                self.code_window.ui(ui, self.hacksys);
+            }
+            AppTab::Cpu => {
+                self.cpu_window.ui(ui, self.hacksys);
+            }
+            AppTab::Data1 => {
+                self.data_window1.ui(ui, self.hacksys);
+            }
+            AppTab::Data2 => {
+                self.data_window2.ui(ui, self.hacksys);
+            }
+            AppTab::Screen => {
+                self.screen_window.ui(ui, self.hacksys);
+            }
+        }
+    }
+}
+
 pub struct HackEgui {
     pub(crate) hacksys: HackSystem,
     running: bool,
     console_window: ConsoleWindow,
-    console_window_open: bool,
     screen_window: ScreenWindow,
     cpu_window: CpuWindow,
     code_window: CodeWindow,
     data_window1: DataWindow,
     data_window2: DataWindow,
     shell: Shell,
+    dock_state: DockState<AppTab>,
 }
 
 #[derive(Debug, Error, PartialEq)]
@@ -39,6 +105,18 @@ impl HackEgui {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         egui_extras::install_image_loaders(&cc.egui_ctx);
 
+        // Build initial dock layout:
+        //   Left 60% = Code
+        //   Right 40% top = [CPU, Data1, Data2, Screen] tabs
+        //   Right 40% bottom = Console
+        let mut dock_state = DockState::new(vec![AppTab::Code]);
+        let surface = dock_state.main_surface_mut();
+        let [_left, right] = surface.split_right(NodeIndex::root(), 0.6, vec![AppTab::Cpu]);
+        surface.push_to_focused_leaf(AppTab::Data1);
+        surface.push_to_focused_leaf(AppTab::Data2);
+        surface.push_to_focused_leaf(AppTab::Screen);
+        let [_top, _bottom] = surface.split_below(right, 0.5, vec![AppTab::Console]);
+
         Self {
             hacksys: HackSystem::new(),
             running: false,
@@ -47,13 +125,13 @@ impl HackEgui {
                 .history_size(20)
                 .tab_quote_character('\"')
                 .build(),
-            console_window_open: true,
             screen_window: ScreenWindow::new(),
             cpu_window: CpuWindow::new(),
             code_window: CodeWindow::new(),
             data_window1: DataWindow::new("Data 1"),
             data_window2: DataWindow::new("Data 2"),
             shell: Shell::new(),
+            dock_state,
         }
     }
 
@@ -76,24 +154,58 @@ impl eframe::App for HackEgui {
     fn save(&mut self, _storage: &mut dyn eframe::Storage) {}
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let mut open = true;
+        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+            egui::menu::bar(ui, |ui| {
+                #[cfg(not(target_arch = "wasm32"))]
+                ui.menu_button("File", |ui| {
+                    if ui.button("Load Binary").clicked() {
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("Hack binary", &["hackem", "hack", "hx"])
+                            .pick_file()
+                        {
+                            let file_name = path
+                                .file_name()
+                                .map(|n| n.to_string_lossy().to_string())
+                                .unwrap_or_default();
+                            let bin = std::fs::read_to_string(&path).unwrap();
+                            let _ = self.hacksys.engine.load_file(&bin);
+                            self.console_write(&format!(
+                                "Loaded {}  ROM: {} words  RAM: {} words",
+                                file_name,
+                                self.hacksys.engine.rom_words_loaded,
+                                self.hacksys.engine.ram_words_loaded
+                            ));
+                        }
+                        ui.close_menu();
+                    }
 
-        // Draw non-console windows
-        self.screen_window.draw(ctx, &mut open, &self.hacksys);
-        self.cpu_window.draw(ctx, &mut open, &self.hacksys);
-        self.code_window.draw(ctx, &mut open, &mut self.hacksys);
-        self.data_window1.draw(ctx, &mut open, &self.hacksys);
-        self.data_window2.draw(ctx, &mut open, &self.hacksys);
-
-        // Console window using egui_console
-        let mut console_response: ConsoleEvent = ConsoleEvent::None;
-        egui::Window::new("Console")
-            .default_height(500.0)
-            .resizable(true)
-            .open(&mut self.console_window_open)
-            .show(ctx, |ui| {
-                console_response = self.console_window.draw(ui);
+                    if ui.button("Quit").clicked() {
+                        self.save_history();
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    }
+                });
+                ui.add_space(16.0);
+                egui::widgets::global_dark_light_mode_buttons(ui);
             });
+        });
+
+        let mut console_response = ConsoleEvent::None;
+
+        egui::CentralPanel::default().show(ctx, |ui| {
+            let mut viewer = AppTabViewer {
+                hacksys: &mut self.hacksys,
+                console_window: &mut self.console_window,
+                console_response: &mut console_response,
+                code_window: &mut self.code_window,
+                cpu_window: &mut self.cpu_window,
+                data_window1: &mut self.data_window1,
+                data_window2: &mut self.data_window2,
+                screen_window: &mut self.screen_window,
+            };
+            DockArea::new(&mut self.dock_state)
+                .style(Style::from_egui(ui.style()))
+                .show_inside(ui, &mut viewer);
+        });
 
         if let ConsoleEvent::Command(cmd) = console_response {
             if let Ok(response) = self.shell.execute_message(&cmd, &mut self.hacksys) {
@@ -115,47 +227,6 @@ impl eframe::App for HackEgui {
                 }
             }
         }
-
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            egui::menu::bar(ui, |ui| {
-                #[cfg(target_arch = "wasm32")]
-                self.wasm_update_and_menu(ui);
-                #[cfg(not(target_arch = "wasm32"))]
-                ui.menu_button("File", |ui| {
-                    if ui.button("Load Binary").clicked() {
-                        if let Some(path) =
-                            rfd::FileDialog::new().add_filter("x", &["hx"]).pick_file()
-                        {
-                            let bin = std::fs::read_to_string(path).unwrap();
-                            let _ignore = self.hacksys.engine.load_file(&bin);
-                        }
-                        ui.close_menu();
-                    }
-
-                    if ui.button("Quit").clicked() {
-                        self.save_history();
-                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                    }
-                });
-                ui.add_space(16.0);
-                egui::widgets::global_dark_light_mode_buttons(ui);
-
-                if ui.button("Console").clicked() {
-                    self.console_window_open = true;
-                }
-            });
-
-            ui.add_enabled_ui(!self.running, |ui| {
-                if ui.button("Step").clicked() {
-                    let _ = self.hacksys.engine.execute_instructions(Duration::ZERO);
-                }
-            });
-
-            let run_label = if self.running { "Pause" } else { "Run" };
-            if ui.button(run_label).clicked() {
-                self.running = !self.running;
-            }
-        });
 
         if self.running {
             let pc = self.hacksys.engine.pc;
