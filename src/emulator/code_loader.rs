@@ -105,7 +105,7 @@ abcd
 ffff"#;
 
         let mut hack = HackEngine::new();
-        hack.load_file(binfile);
+        hack.load_file(binfile).unwrap();
 
         assert_eq!(hack.rom[0], 0x0002);
         assert_eq!(hack.rom[1], 0x8c10);
