@@ -167,14 +167,19 @@ impl eframe::App for HackEgui {
                                 .file_name()
                                 .map(|n| n.to_string_lossy().to_string())
                                 .unwrap_or_default();
-                            let bin = std::fs::read_to_string(&path).unwrap();
-                            let _ = self.hacksys.engine.load_file(&bin);
-                            self.console_write(&format!(
-                                "Loaded {}  ROM: {} words  RAM: {} words",
-                                file_name,
-                                self.hacksys.engine.rom_words_loaded,
-                                self.hacksys.engine.ram_words_loaded
-                            ));
+                            match std::fs::read_to_string(&path) {
+                                Err(e) => self
+                                    .console_write(&format!("Error reading {}: {}", file_name, e)),
+                                Ok(bin) => match self.hacksys.engine.load_file(&bin) {
+                                    Err(e) => self.console_write(&format!("Load error: {}", e)),
+                                    Ok(()) => self.console_write(&format!(
+                                        "Loaded {}  ROM: {} words  RAM: {} words",
+                                        file_name,
+                                        self.hacksys.engine.rom_words_loaded,
+                                        self.hacksys.engine.ram_words_loaded
+                                    )),
+                                },
+                            }
                         }
                         ui.close_menu();
                     }
