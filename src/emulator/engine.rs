@@ -1023,4 +1023,27 @@ mod tests {
         }
         assert!(cpu.ram[1] == 0);
     }
+
+    // Run a real C program compiled by hack_cc:
+    //   factorial(5) + fib(7) = 120 + 13 = 133
+    // The return value of main ends up at RAM[256] (top of the call stack).
+    #[test]
+    fn test_c_program_factorial_fib() {
+        let mut engine = HackEngine::new();
+        let content = include_str!("../../tests/data/test2.hackem");
+        engine.load_file(content).unwrap();
+
+        let result = loop {
+            let stop = engine
+                .execute_instructions(Duration::from_secs(10))
+                .unwrap();
+            match stop {
+                StopReason::SysHalt | StopReason::HardLoop => break stop,
+                StopReason::RefreshUI => continue,
+                other => panic!("unexpected stop: {:?}", other),
+            }
+        };
+        assert_eq!(result, StopReason::SysHalt);
+        assert_eq!(engine.ram[256] as i16, 133);
+    }
 }
