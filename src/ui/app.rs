@@ -117,14 +117,26 @@ impl HackEgui {
         surface.push_to_focused_leaf(AppTab::Screen);
         let [_top, _bottom] = surface.split_below(right, 0.5, vec![AppTab::Console]);
 
+        let mut console_window = ConsoleBuilder::new()
+            .prompt(">> ")
+            .history_size(50)
+            .tab_quote_character('\"')
+            .build();
+
+        // Load persisted history
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(home) = dirs::home_dir() {
+            let history_path = home.join(".hackem_history");
+            if let Ok(contents) = std::fs::read_to_string(&history_path) {
+                // store so lifetime covers the load_history call
+                console_window.load_history(contents.lines());
+            }
+        }
+
         Self {
             hacksys: HackSystem::new(),
             running: false,
-            console_window: ConsoleBuilder::new()
-                .prompt(">> ")
-                .history_size(20)
-                .tab_quote_character('\"')
-                .build(),
+            console_window,
             screen_window: ScreenWindow::new(),
             cpu_window: CpuWindow::new(),
             code_window: CodeWindow::new(),
