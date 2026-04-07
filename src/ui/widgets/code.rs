@@ -45,7 +45,7 @@ impl CodeWindow {
         });
         ui.separator();
 
-        ScrollArea::vertical().id_source(self.id).show(ui, |ui| {
+        ScrollArea::vertical().id_salt(self.id).show(ui, |ui| {
             egui::Grid::new("code_grid")
                 .num_columns(5)
                 .spacing([4.0, 2.0])

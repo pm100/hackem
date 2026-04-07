@@ -52,38 +52,36 @@ impl DataWindow {
         });
         ui.separator();
 
-        ScrollArea::vertical()
-            .id_source(&self.title)
-            .show(ui, |ui| {
-                egui::Grid::new(format!("{}_grid", self.title))
-                    .num_columns(9)
-                    .spacing([4.0, 2.0])
-                    .striped(true)
-                    .show(ui, |ui| {
-                        for row in 0..self.row_count {
-                            let base = self.start_addr.wrapping_add(row * 8);
-                            ui.label(
-                                RichText::new(format!("{:04X}:", base))
-                                    .monospace()
-                                    .color(addr_color),
-                            );
-                            for col in 0..8u16 {
-                                let addr = base.wrapping_add(col);
-                                if addr as usize >= hacksys.engine.ram.len() {
-                                    ui.label("----");
-                                } else {
-                                    let val = hacksys.engine.ram[addr as usize];
-                                    ui.label(
-                                        RichText::new(format!("{:04X}", val))
-                                            .monospace()
-                                            .color(val_color),
-                                    )
-                                    .on_hover_text(format!("{} ({})", val, val as i16));
-                                }
+        ScrollArea::vertical().id_salt(&self.title).show(ui, |ui| {
+            egui::Grid::new(format!("{}_grid", self.title))
+                .num_columns(9)
+                .spacing([4.0, 2.0])
+                .striped(true)
+                .show(ui, |ui| {
+                    for row in 0..self.row_count {
+                        let base = self.start_addr.wrapping_add(row * 8);
+                        ui.label(
+                            RichText::new(format!("{:04X}:", base))
+                                .monospace()
+                                .color(addr_color),
+                        );
+                        for col in 0..8u16 {
+                            let addr = base.wrapping_add(col);
+                            if addr as usize >= hacksys.engine.ram.len() {
+                                ui.label("----");
+                            } else {
+                                let val = hacksys.engine.ram[addr as usize];
+                                ui.label(
+                                    RichText::new(format!("{:04X}", val))
+                                        .monospace()
+                                        .color(val_color),
+                                )
+                                .on_hover_text(format!("{} ({})", val, val as i16));
                             }
-                            ui.end_row();
                         }
-                    });
-            });
+                        ui.end_row();
+                    }
+                });
+        });
     }
 }

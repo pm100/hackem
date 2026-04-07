@@ -167,7 +167,7 @@ impl eframe::App for HackEgui {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            egui::menu::bar(ui, |ui| {
+            egui::MenuBar::new().ui(ui, |ui| {
                 #[cfg(not(target_arch = "wasm32"))]
                 ui.menu_button("File", |ui| {
                     if ui.button("Load Binary").clicked() {
@@ -193,7 +193,7 @@ impl eframe::App for HackEgui {
                                 },
                             }
                         }
-                        ui.close_menu();
+                        ui.close();
                     }
 
                     if ui.button("Quit").clicked() {
@@ -202,7 +202,7 @@ impl eframe::App for HackEgui {
                     }
                 });
                 ui.add_space(16.0);
-                egui::widgets::global_dark_light_mode_buttons(ui);
+                egui::global_theme_preference_buttons(ui);
             });
         });
 
