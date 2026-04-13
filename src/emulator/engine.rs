@@ -88,33 +88,40 @@ impl HackEngine {
             x & y
         }
     }
-    pub fn set_ram(&mut self, address: u16, value: u16) -> Result<()> {
+    pub fn set_ram(&mut self, address: u16, value: u16) -> Result<bool> {
         if address >= 0x8000 {
             //  println!("Invalid address {:04x} at {:04x}", address, self.pc);
             bail!(RuntimeError::InvalidWriteAddress(address));
         }
 
-        match address {
+       let ui_stop =  match address {
             0x0000..=0x3fff => {
                 self.ram[address as usize] = value;
+                false
             }
             0x4000..=0x5fff => {
                 // screen
                 self.ram[address as usize] = value;
+                true
             }
             0x6000 => {
                 // keyboard - write ignored
+                false
             }
+            // 0x7fff => {
+            //    // eprint!("{}", value);
+            // }
             _ => {
                 self.ram[address as usize] = value;
+                address == 0x7FFF // write to output stream
             }
-        }
+        };
         if let Some(wp) = self.watch_points.get(&address) {
             if wp.write && wp.enabled {
                 self.triggered_watchpoint = Some(address);
             }
         }
-        Ok(())
+        Ok(ui_stop)
     }
     pub fn get_ram(&mut self, address: u16) -> Result<u16> {
         if address >= 0x8000 {
@@ -165,7 +172,7 @@ impl HackEngine {
             }
             let opcode = instruction >> 15;
             let old_pc = self.pc;
-
+let mut ui_stop = false;
             self.pc += 1;
             match opcode {
                 0 => {
@@ -209,7 +216,7 @@ impl HackEngine {
 
                     // M
                     if d & 0x1 != 0 {
-                        self.set_ram(self.a, alu_out)?;
+                        ui_stop = self.set_ram(self.a, alu_out)?;
                     }
                     // D
                     if d & 0x2 != 0 {
@@ -253,7 +260,7 @@ impl HackEngine {
             if self.triggered_watchpoint.take().is_some() {
                 return Ok(StopReason::WatchPoint);
             }
-            if run_time == Duration::ZERO {
+            if run_time == Duration::ZERO || ui_stop{
                 return Ok(StopReason::RefreshUI);
             }
         }

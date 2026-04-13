@@ -42,6 +42,7 @@ struct AppTabViewer<'a> {
     data_window1: &'a mut DataWindow,
     data_window2: &'a mut DataWindow,
     screen_window: &'a mut ScreenWindow,
+    
 }
 
 impl<'a> TabViewer for AppTabViewer<'a> {
@@ -86,6 +87,7 @@ pub struct HackEgui {
     data_window2: DataWindow,
     shell: Shell,
     dock_state: DockState<AppTab>,
+    puts_buffer:String
 }
 
 #[derive(Debug, Error, PartialEq)]
@@ -144,6 +146,7 @@ impl HackEgui {
             data_window2: DataWindow::new("Data 2"),
             shell: Shell::new(),
             dock_state,
+            puts_buffer:String::new()
         }
     }
 
@@ -275,6 +278,17 @@ impl eframe::App for HackEgui {
                     }
                     StopReason::RefreshUI => {
                         ctx.request_repaint();
+                        if self.hacksys.engine.ram[32767] != 0{
+                            let ch = self.hacksys.engine.ram[32767] as u8;
+                            self.hacksys.engine.ram[32767] = 0;
+                            if ch == 13 || ch == 10{
+                                self.console_write(&self.puts_buffer.clone());
+                                self.puts_buffer.clear();
+                            }
+                            else{
+                                self.puts_buffer.push(ch as char);
+                            }
+                        }
                     }
                 },
                 Err(err) => {
