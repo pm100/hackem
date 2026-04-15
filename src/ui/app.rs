@@ -166,9 +166,9 @@ impl HackEgui {
     }
 
     /// Drain the engine's output port buffer, split into lines, and print each
-    /// complete line to the console. Any partial (no trailing newline) line is
-    /// held in `output_line_buf` until the next call or until `flush` is true,
-    /// in which case it is printed as-is.
+    /// complete line to the console without re-prompting (program output should
+    /// not intersperse prompts between lines). Any partial line is held in
+    /// `output_line_buf` until the next call or until `flush` is true.
     fn drain_output(&mut self, flush: bool) {
         let raw = self.hacksys.engine.take_output();
         if raw.is_empty() && !flush {
@@ -178,11 +178,11 @@ impl HackEgui {
         while let Some(pos) = self.output_line_buf.find('\n') {
             let line: String = self.output_line_buf.drain(..=pos).collect();
             let line = line.trim_end_matches(['\n', '\r']);
-            self.console_write(line);
+            self.console_window.write(line);
         }
         if flush && !self.output_line_buf.is_empty() {
             let line = std::mem::take(&mut self.output_line_buf);
-            self.console_write(line.trim_end_matches(['\n', '\r']));
+            self.console_window.write(line.trim_end_matches(['\n', '\r']));
         }
     }
 }
