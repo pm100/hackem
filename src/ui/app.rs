@@ -87,7 +87,8 @@ pub struct HackEgui {
     data_window2: DataWindow,
     shell: Shell,
     dock_state: DockState<AppTab>,
-    puts_buffer:String
+    /// Partial output line buffer: holds chars received since the last newline.
+    output_line_buf: String,
 }
 
 #[derive(Debug, Error, PartialEq)]
@@ -146,7 +147,7 @@ impl HackEgui {
             data_window2: DataWindow::new("Data 2"),
             shell: Shell::new(),
             dock_state,
-            puts_buffer:String::new()
+            output_line_buf: String::new(),
         }
     }
 
@@ -162,6 +163,27 @@ impl HackEgui {
     fn console_write(&mut self, msg: &str) {
         self.console_window.write(msg);
         self.console_window.prompt();
+    }
+
+    /// Drain the engine's output port buffer, split into lines, and print each
+    /// complete line to the console. Any partial (no trailing newline) line is
+    /// held in `output_line_buf` until the next call or until `flush` is true,
+    /// in which case it is printed as-is.
+    fn drain_output(&mut self, flush: bool) {
+        let raw = self.hacksys.engine.take_output();
+        if raw.is_empty() && !flush {
+            return;
+        }
+        self.output_line_buf.push_str(&raw);
+        while let Some(pos) = self.output_line_buf.find('\n') {
+            let line: String = self.output_line_buf.drain(..=pos).collect();
+            let line = line.trim_end_matches(['\n', '\r']);
+            self.console_write(line);
+        }
+        if flush && !self.output_line_buf.is_empty() {
+            let line = std::mem::take(&mut self.output_line_buf);
+            self.console_write(line.trim_end_matches(['\n', '\r']));
+        }
     }
 }
 
@@ -257,16 +279,19 @@ impl eframe::App for HackEgui {
                 Ok(reason) => match reason {
                     StopReason::SysHalt => {
                         self.running = false;
+                        self.drain_output(true);
                         self.console_write("SysHalt");
                         ctx.request_repaint();
                     }
                     StopReason::HardLoop => {
                         self.running = false;
+                        self.drain_output(true);
                         self.console_write(&format!("Hard loop at 0x{:04X}", self.hacksys.engine.pc));
                         ctx.request_repaint();
                     }
                     StopReason::BreakPoint => {
                         self.running = false;
+                        self.drain_output(true);
                         self.console_write(&format!(
                             "Breakpoint hit at 0x{:04X}",
                             self.hacksys.engine.pc
@@ -275,27 +300,19 @@ impl eframe::App for HackEgui {
                     }
                     StopReason::WatchPoint => {
                         self.running = false;
+                        self.drain_output(true);
                         let addr = self.hacksys.engine.triggered_watchpoint.unwrap_or(0);
                         self.console_write(&format!("Watchpoint hit at 0x{:04X}", addr));
                         ctx.request_repaint();
                     }
                     StopReason::RefreshUI => {
+                        self.drain_output(false);
                         ctx.request_repaint();
-                        if self.hacksys.engine.ram[32767] != 0{
-                            let ch = self.hacksys.engine.ram[32767] as u8;
-                            self.hacksys.engine.ram[32767] = 0;
-                            if ch == 13 || ch == 10{
-                                self.console_write(&self.puts_buffer.clone());
-                                self.puts_buffer.clear();
-                            }
-                            else{
-                                self.puts_buffer.push(ch as char);
-                            }
-                        }
                     }
                 },
                 Err(err) => {
                     self.running = false;
+                    self.drain_output(true);
                     self.console_write(&format!("Error: {}", err));
                     ctx.request_repaint();
                 }

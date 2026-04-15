@@ -29,6 +29,8 @@ pub struct HackEngine {
     pub break_points: BTreeMap<u16, BreakPoint>,
     pub watch_points: BTreeMap<u16, WatchPoint>,
     pub triggered_watchpoint: Option<u16>,
+    /// Output port buffer: bytes written to RAM[0x7FFF] accumulate here.
+    output_buffer: Vec<u8>,
 }
 #[derive(Debug, PartialEq)]
 pub(crate) enum StopReason {
@@ -60,6 +62,7 @@ impl HackEngine {
             break_points: BTreeMap::new(),
             watch_points: BTreeMap::new(),
             triggered_watchpoint: None,
+            output_buffer: Vec::new(),
         }
     }
     fn alu(x_in: u16, y_in: u16, c: u16) -> u16 {
@@ -90,11 +93,10 @@ impl HackEngine {
     }
     pub fn set_ram(&mut self, address: u16, value: u16) -> Result<bool> {
         if address >= 0x8000 {
-            //  println!("Invalid address {:04x} at {:04x}", address, self.pc);
             bail!(RuntimeError::InvalidWriteAddress(address));
         }
 
-       let ui_stop =  match address {
+        let ui_stop = match address {
             0x0000..=0x3fff => {
                 self.ram[address as usize] = value;
                 false
@@ -108,12 +110,14 @@ impl HackEngine {
                 // keyboard - write ignored
                 false
             }
-            // 0x7fff => {
-            //    // eprint!("{}", value);
-            // }
+            0x7fff => {
+                // output port: buffer the byte, never interrupt execution
+                self.output_buffer.push(value as u8);
+                false
+            }
             _ => {
                 self.ram[address as usize] = value;
-                address == 0x7FFF // write to output stream
+                false
             }
         };
         if let Some(wp) = self.watch_points.get(&address) {
@@ -122,6 +126,14 @@ impl HackEngine {
             }
         }
         Ok(ui_stop)
+    }
+
+    /// Drain all bytes written to the output port (RAM[0x7FFF]) since the last call.
+    /// Returns a lossy UTF-8 string of the accumulated output.
+    pub fn take_output(&mut self) -> String {
+        let s = String::from_utf8_lossy(&self.output_buffer).into_owned();
+        self.output_buffer.clear();
+        s
     }
     pub fn get_ram(&mut self, address: u16) -> Result<u16> {
         if address >= 0x8000 {
