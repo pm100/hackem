@@ -1057,4 +1057,59 @@ mod tests {
         assert_eq!(result, StopReason::SysHalt);
         assert_eq!(engine.ram[256] as i16, 133);
     }
+
+    #[test]
+    fn test_hello_screen_output() {
+        let mut engine = HackEngine::new();
+        let content = include_str!("../../hello.hackem");
+        engine.load_file(content).unwrap();
+
+        let result = loop {
+            let stop = engine
+                .execute_instructions(Duration::from_secs(10))
+                .unwrap();
+            match stop {
+                StopReason::SysHalt | StopReason::HardLoop => break stop,
+                StopReason::RefreshUI => continue,
+                other => panic!("unexpected stop: {:?}", other),
+            }
+        };
+        assert_eq!(result, StopReason::SysHalt);
+
+        let screen = &engine.ram[0x4000..0x6000];
+        let nonzero_count = screen.iter().filter(|&&v| v != 0).count();
+        assert!(
+            nonzero_count > 0,
+            "Screen should have non-zero pixels after hello program runs"
+        );
+    }
+
+    #[test]
+    fn test_hack_binary_screen_write() {
+        // Minimal .hack binary: @16384; M=-1; @16416; M=-1; @4; 0;JMP
+        let hack_binary = "\
+0100000000000000
+1110111010001000
+0100000000100000
+1110111010001000
+0000000000000100
+1110101010000111";
+        let mut engine = HackEngine::new();
+        engine.load_file(hack_binary).unwrap();
+        assert_eq!(engine.rom_words_loaded, 6);
+
+        let result = loop {
+            let stop = engine
+                .execute_instructions(Duration::from_secs(1))
+                .unwrap();
+            match stop {
+                StopReason::HardLoop => break stop,
+                StopReason::RefreshUI => continue,
+                other => panic!("unexpected stop: {:?}", other),
+            }
+        };
+        assert_eq!(result, StopReason::HardLoop);
+        assert_eq!(engine.ram[0x4000], 0xFFFF, "screen word 0 should be all-1s");
+        assert_eq!(engine.ram[0x4020], 0xFFFF, "screen word 32 should be all-1s");
+    }
 }

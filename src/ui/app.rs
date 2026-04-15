@@ -249,7 +249,6 @@ impl eframe::App for HackEgui {
         }
 
         if self.running {
-            let pc = self.hacksys.engine.pc;
             let stop = self
                 .hacksys
                 .engine
@@ -259,10 +258,12 @@ impl eframe::App for HackEgui {
                     StopReason::SysHalt => {
                         self.running = false;
                         self.console_write("SysHalt");
+                        ctx.request_repaint();
                     }
                     StopReason::HardLoop => {
                         self.running = false;
-                        self.console_write(&format!("Hard loop at 0x{:04X}", pc));
+                        self.console_write(&format!("Hard loop at 0x{:04X}", self.hacksys.engine.pc));
+                        ctx.request_repaint();
                     }
                     StopReason::BreakPoint => {
                         self.running = false;
@@ -270,11 +271,13 @@ impl eframe::App for HackEgui {
                             "Breakpoint hit at 0x{:04X}",
                             self.hacksys.engine.pc
                         ));
+                        ctx.request_repaint();
                     }
                     StopReason::WatchPoint => {
                         self.running = false;
                         let addr = self.hacksys.engine.triggered_watchpoint.unwrap_or(0);
                         self.console_write(&format!("Watchpoint hit at 0x{:04X}", addr));
+                        ctx.request_repaint();
                     }
                     StopReason::RefreshUI => {
                         ctx.request_repaint();
@@ -294,6 +297,7 @@ impl eframe::App for HackEgui {
                 Err(err) => {
                     self.running = false;
                     self.console_write(&format!("Error: {}", err));
+                    ctx.request_repaint();
                 }
             }
         }
