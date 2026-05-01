@@ -4,6 +4,7 @@ use crate::ui::app::RuntimeError;
 
 use crate::ui::widgets::screen::CURRENT_KEY;
 use anyhow::{bail, Result};
+use egui::Color32;
 use web_time::{Duration, Instant};
 pub(crate) struct BreakPoint {
     pub enabled: bool,
@@ -31,6 +32,11 @@ pub struct HackEngine {
     pub triggered_watchpoint: Option<u16>,
     /// Output port buffer: bytes written to RAM[0x7FFF] accumulate here.
     output_buffer: Vec<u8>,
+    /// Pre-rendered screen pixels (512×256). Updated incrementally on every
+    /// screen-RAM write so the UI can blit without scanning all 8 192 words.
+    pub screen_pixels: Vec<Color32>,
+    /// Set whenever `screen_pixels` has changed since the last GPU upload.
+    pub screen_dirty: bool,
 }
 #[derive(Debug, PartialEq)]
 pub(crate) enum StopReason {
@@ -63,6 +69,8 @@ impl HackEngine {
             watch_points: BTreeMap::new(),
             triggered_watchpoint: None,
             output_buffer: Vec::new(),
+            screen_pixels: vec![Color32::WHITE; 512 * 256],
+            screen_dirty: true,
         }
     }
     fn alu(x_in: u16, y_in: u16, c: u16) -> u16 {
@@ -102,9 +110,18 @@ impl HackEngine {
                 false
             }
             0x4000..=0x5fff => {
-                // screen
+                // screen — update pixel cache immediately
                 self.ram[address as usize] = value;
-                true
+                let pixel_base = (address as usize - 0x4000) * 16;
+                for i in 0..16usize {
+                    self.screen_pixels[pixel_base + i] = if value & (1u16 << i) != 0 {
+                        Color32::BLACK
+                    } else {
+                        Color32::WHITE
+                    };
+                }
+                self.screen_dirty = true;
+                false
             }
             0x6000 => {
                 // keyboard - write ignored
@@ -134,6 +151,23 @@ impl HackEngine {
         let s = String::from_utf8_lossy(&self.output_buffer).into_owned();
         self.output_buffer.clear();
         s
+    }
+
+    /// Rebuild `screen_pixels` from the raw RAM contents.
+    /// Called after bulk RAM writes (e.g. `load_file`) that bypass `set_ram`.
+    pub fn sync_screen_pixels_from_ram(&mut self) {
+        for offset in 0..0x2000usize {
+            let word = self.ram[0x4000 + offset];
+            let pixel_base = offset * 16;
+            for i in 0..16usize {
+                self.screen_pixels[pixel_base + i] = if word & (1u16 << i) != 0 {
+                    Color32::BLACK
+                } else {
+                    Color32::WHITE
+                };
+            }
+        }
+        self.screen_dirty = true;
     }
     pub fn get_ram(&mut self, address: u16) -> Result<u16> {
         if address >= 0x8000 {
@@ -184,7 +218,7 @@ impl HackEngine {
             }
             let opcode = instruction >> 15;
             let old_pc = self.pc;
-let mut ui_stop = false;
+            let mut ui_stop = false;
             self.pc += 1;
             match opcode {
                 0 => {
@@ -272,7 +306,7 @@ let mut ui_stop = false;
             if self.triggered_watchpoint.take().is_some() {
                 return Ok(StopReason::WatchPoint);
             }
-            if run_time == Duration::ZERO || ui_stop{
+            if run_time == Duration::ZERO || ui_stop {
                 return Ok(StopReason::RefreshUI);
             }
         }
@@ -1111,9 +1145,7 @@ mod tests {
         assert_eq!(engine.rom_words_loaded, 6);
 
         let result = loop {
-            let stop = engine
-                .execute_instructions(Duration::from_secs(1))
-                .unwrap();
+            let stop = engine.execute_instructions(Duration::from_secs(1)).unwrap();
             match stop {
                 StopReason::HardLoop => break stop,
                 StopReason::RefreshUI => continue,
@@ -1122,6 +1154,9 @@ mod tests {
         };
         assert_eq!(result, StopReason::HardLoop);
         assert_eq!(engine.ram[0x4000], 0xFFFF, "screen word 0 should be all-1s");
-        assert_eq!(engine.ram[0x4020], 0xFFFF, "screen word 32 should be all-1s");
+        assert_eq!(
+            engine.ram[0x4020], 0xFFFF,
+            "screen word 32 should be all-1s"
+        );
     }
 }

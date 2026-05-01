@@ -42,7 +42,7 @@ struct AppTabViewer<'a> {
     data_window1: &'a mut DataWindow,
     data_window2: &'a mut DataWindow,
     screen_window: &'a mut ScreenWindow,
-    
+    running: bool,
 }
 
 impl<'a> TabViewer for AppTabViewer<'a> {
@@ -57,6 +57,15 @@ impl<'a> TabViewer for AppTabViewer<'a> {
             AppTab::Console => {
                 *self.console_response = self.console_window.draw(ui);
             }
+            AppTab::Screen => {
+                self.screen_window.ui(ui, self.hacksys);
+            }
+            // While running, freeze heavyweight views to avoid wasting CPU.
+            AppTab::Code | AppTab::Cpu | AppTab::Data1 | AppTab::Data2 if self.running => {
+                ui.centered_and_justified(|ui| {
+                    ui.label("⏸ paused while running");
+                });
+            }
             AppTab::Code => {
                 self.code_window.ui(ui, self.hacksys);
             }
@@ -68,9 +77,6 @@ impl<'a> TabViewer for AppTabViewer<'a> {
             }
             AppTab::Data2 => {
                 self.data_window2.ui(ui, self.hacksys);
-            }
-            AppTab::Screen => {
-                self.screen_window.ui(ui, self.hacksys);
             }
         }
     }
@@ -185,12 +191,18 @@ impl HackEgui {
             self.console_window.write(line.trim_end_matches(['\n', '\r']));
         }
     }
+    fn do_break(&mut self) {
+        self.running = false;
+        self.drain_output(true);
+        self.console_write(&format!("Break at 0x{:04X}", self.hacksys.engine.pc));
+    }
 }
 
 impl eframe::App for HackEgui {
     fn save(&mut self, _storage: &mut dyn eframe::Storage) {}
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 #[cfg(not(target_arch = "wasm32"))]
@@ -227,6 +239,17 @@ impl eframe::App for HackEgui {
                     }
                 });
                 ui.add_space(16.0);
+                // Break button — visible only while running.
+                if self.running {
+                    if ui
+                        .add(egui::Button::new("⏹ Break").fill(egui::Color32::DARK_RED))
+                        .on_hover_text("Break into program")
+                        .clicked()
+                    {
+                        self.do_break();
+                    }
+                    ui.add_space(8.0);
+                }
                 egui::global_theme_preference_buttons(ui);
             });
         });
@@ -243,6 +266,7 @@ impl eframe::App for HackEgui {
                 data_window1: &mut self.data_window1,
                 data_window2: &mut self.data_window2,
                 screen_window: &mut self.screen_window,
+                running: self.running,
             };
             DockArea::new(&mut self.dock_state)
                 .style(Style::from_egui(ui.style()))
@@ -254,6 +278,17 @@ impl eframe::App for HackEgui {
                 match response.as_str() {
                     "__go__" => {
                         self.running = true;
+                        // Switch to Screen tab so the display is visible while running.
+                        if let Some((surface, node, tab)) =
+                            self.dock_state.find_tab(&AppTab::Screen)
+                        {
+                            if let Some(leaf) = self.dock_state[surface][node].get_leaf_mut() {
+                                leaf.set_active_tab(tab);
+                            }
+                        }
+                    }
+                    "__stop__" => {
+                        self.do_break();
                     }
                     "__quit__" => {
                         self.save_history();

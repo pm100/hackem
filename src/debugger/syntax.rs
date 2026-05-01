@@ -60,6 +60,12 @@ pub fn syntax() -> Command {
                 .help_template(APPLET_TEMPLATE),
         )
         .subcommand(
+            Command::new("stop")
+                .visible_aliases(["halt", "pause"])
+                .about("Break into a running program")
+                .help_template(APPLET_TEMPLATE),
+        )
+        .subcommand(
             Command::new("break")
                 .about("Set breakpoint")
                 .visible_alias("b")

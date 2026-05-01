@@ -97,6 +97,7 @@ impl HackEngine {
         self.rom_words_loaded = rom_count;
         self.ram_words_loaded = ram_count;
         self.pc = 0;
+        self.sync_screen_pixels_from_ram();
         Ok(())
     }
 }

@@ -17,7 +17,7 @@ impl ScreenWindow {
         }
     }
 
-    pub fn ui(&mut self, ui: &mut Ui, hacksys: &HackSystem) {
+    pub fn ui(&mut self, ui: &mut Ui, hacksys: &mut HackSystem) {
         let ctx = ui.ctx().clone();
         // Handle keyboard input when screen is focused
         if ctx.memory(|mem| mem.has_focus(self.paint_id)) {
@@ -37,37 +37,20 @@ impl ScreenWindow {
             });
         }
 
-        let (fg, bg) = if ui.style().visuals.dark_mode {
-            (egui::Color32::WHITE, egui::Color32::BLACK)
-        } else {
-            (egui::Color32::BLACK, egui::Color32::WHITE)
-        };
-
-        // Build screen image from RAM
-        let screen = &hacksys.engine.ram[0x4000..0x6000];
-        let mut pixels = vec![bg; SCREEN_WIDTH * SCREEN_HEIGHT];
-        for row in 0..SCREEN_HEIGHT {
-            for col in 0..SCREEN_WIDTH / 16 {
-                let word = screen[row * (SCREEN_WIDTH / 16) + col];
-                if word != 0 {
-                    for i in 0..16u16 {
-                        if word & (1 << i) != 0 {
-                            pixels[row * SCREEN_WIDTH + col * 16 + i as usize] = fg;
-                        }
-                    }
+        // Upload texture to GPU only when the engine has written new screen pixels.
+        if hacksys.engine.screen_dirty || self.texture.is_none() {
+            let image = ColorImage::new(
+                [SCREEN_WIDTH, SCREEN_HEIGHT],
+                hacksys.engine.screen_pixels.clone(),
+            );
+            let opts = TextureOptions::NEAREST;
+            match &mut self.texture {
+                Some(tex) => tex.set(image, opts),
+                None => {
+                    self.texture = Some(ctx.load_texture("hack_screen", image, opts));
                 }
             }
-        }
-
-        let image = ColorImage::new([SCREEN_WIDTH, SCREEN_HEIGHT], pixels);
-
-        // Update or create the texture
-        let opts = TextureOptions::NEAREST;
-        match &mut self.texture {
-            Some(tex) => tex.set(image, opts),
-            None => {
-                self.texture = Some(ctx.load_texture("hack_screen", image, opts));
-            }
+            hacksys.engine.screen_dirty = false;
         }
 
         if let Some(tex) = &self.texture {

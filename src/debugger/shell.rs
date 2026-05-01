@@ -73,6 +73,7 @@ impl Shell {
                 Ok(format!("PC={:04X}  A={:04X}  D={:04X}", pc, a, d))
             }
             Some(("go", _)) => Ok("__go__".to_string()),
+            Some(("stop", _)) => Ok("__stop__".to_string()),
 
             // breakpoints
             Some(("break", args)) => {
@@ -231,7 +232,7 @@ impl Shell {
                 let val_raw = args.get_one::<String>("value").unwrap();
                 let addr = self.resolve_addr(addr_raw, hacksys)?;
                 let val = self.resolve_addr(val_raw, hacksys)?;
-                hacksys.engine.ram[addr as usize] = val;
+                hacksys.engine.set_ram(addr, val)?;
                 Ok(format!("0x{:04X} <- 0x{:04X}", addr, val))
             }
 
