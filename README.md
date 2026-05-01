@@ -1,84 +1,226 @@
-# eframe template
+# hackem
 
-[![dependency status](https://deps.rs/repo/github/emilk/eframe_template/status.svg)](https://deps.rs/repo/github/emilk/eframe_template)
-[![Build Status](https://github.com/emilk/eframe_template/workflows/CI/badge.svg)](https://github.com/emilk/eframe_template/actions?workflow=CI)
+A cycle-accurate emulator and interactive debugger for the [Hack CPU](https://www.nand2tetris.org/) — the 16-bit architecture from the *Nand to Tetris* course. Built with [egui](https://github.com/emilk/egui)/eframe; runs natively and in the browser via WebAssembly.
 
-This is a template repo for [eframe](https://github.com/emilk/egui/tree/master/crates/eframe), a framework for writing apps using [egui](https://github.com/emilk/egui/).
+---
 
-The goal is for this to be the simplest way to get started writing a GUI app in Rust.
+## Features
 
-You can compile your app natively or for the web, and share it using Github Pages.
+- **Full Hack CPU emulation** — 16-bit ALU, 32 KB ROM, 32 KB RAM, accurate A/D/PC registers
+- **512×256 screen** — real-time pixel display mapped from RAM (`0x4000–0x5FFF`), incremental updates
+- **Keyboard input** — key presses forwarded to the Hack keyboard register (`0x6000`)
+- **Output port** — writes to `RAM[0x7FFF]` are captured as ASCII and shown in the console
+- **Interactive debugger console** with command history, reverse-search (Ctrl-R), and tab completion
+- **Breakpoints** and **watchpoints** (read/write)
+- **Disassembler** with breakpoint annotations and PC indicator
+- **Symbol support** — load a PDB (JSON debug info) and use symbol names as addresses
+- **Expression evaluator** — arithmetic expressions anywhere an address is expected
+- **Dockable GUI** — Console, Code, CPU registers, two Data views, and Screen tabs
+- **Break button** — interrupt a running program from the toolbar
 
-## Getting started
+---
 
-Start by clicking "Use this template" at https://github.com/emilk/eframe_template/ or follow [these instructions](https://docs.github.com/en/free-pro-team@latest/github/creating-cloning-and-archiving-repositories/creating-a-repository-from-a-template).
+## Building & Running
 
-Change the name of the crate: Chose a good name for your project, and change the name to it in:
-* `Cargo.toml`
-    * Change the `package.name` from `eframe_template` to `your_crate`.
-    * Change the `package.authors`
-* `main.rs`
-    * Change `eframe_template::TemplateApp` to `your_crate::TemplateApp`
-* `index.html`
-    * Change the `<title>eframe template</title>` to `<title>your_crate</title>`. optional.
-* `assets/sw.js`
-  * Change the `'./eframe_template.js'` to `./your_crate.js` (in `filesToCache` array)
-  * Change the `'./eframe_template_bg.wasm'` to `./your_crate_bg.wasm` (in `filesToCache` array)
+### Prerequisites
 
-### Learning about egui
+```sh
+rustup target add wasm32-unknown-unknown   # for web builds
+cargo install --locked trunk               # for web builds
+```
 
-`src/app.rs` contains a simple example app. This is just to give some inspiration - most of it can be removed if you like.
+> The Rust toolchain is pinned to **1.76.0** via `rust-toolchain`.
 
-The official egui docs are at <https://docs.rs/egui>. If you prefer watching a video introduction, check out <https://www.youtube.com/watch?v=NtUkr_z7l84>. For inspiration, check out the [the egui web demo](https://emilk.github.io/egui/index.html) and follow the links in it to its source code.
+### Native
 
-### Testing locally
+```sh
+cargo run --release
+```
 
-Make sure you are using the latest version of stable rust by running `rustup update`.
+On Linux, install the required system libraries first:
 
-`cargo run --release`
+```sh
+sudo apt-get install libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev \
+                     libxkbcommon-dev libssl-dev
+```
 
-On Linux you need to first run:
+### Web (dev server)
 
-`sudo apt-get install libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev`
+```sh
+trunk serve
+# open http://127.0.0.1:8080/index.html#dev
+```
 
-On Fedora Rawhide you need to run:
+### Web (production build)
 
-`dnf install clang clang-devel clang-tools-extra libxkbcommon-devel pkg-config openssl-devel libxcb-devel gtk3-devel atk fontconfig-devel`
+```sh
+trunk build --release
+# output in dist/  — upload to GitHub Pages or any static host
+```
 
-### Web Locally
+---
 
-You can compile your app to [WASM](https://en.wikipedia.org/wiki/WebAssembly) and publish it as a web page.
+## File Formats
 
-We use [Trunk](https://trunkrs.dev/) to build for web target.
-1. Install the required target with `rustup target add wasm32-unknown-unknown`.
-2. Install Trunk with `cargo install --locked trunk`.
-3. Run `trunk serve` to build and serve on `http://127.0.0.1:8080`. Trunk will rebuild automatically if you edit the project.
-4. Open `http://127.0.0.1:8080/index.html#dev` in a browser. See the warning below.
+### `.hx` — hackem binary (native format)
 
-> `assets/sw.js` script will try to cache our app, and loads the cached version when it cannot connect to server allowing your app to work offline (like PWA).
-> appending `#dev` to `index.html` will skip this caching, allowing us to load the latest builds during development.
+Produced by the Hack assembler/compiler toolchain. Contains ROM and optional RAM preload sections.
 
-### Web Deploy
-1. Just run `trunk build --release`.
-2. It will generate a `dist` directory as a "static html" website
-3. Upload the `dist` directory to any of the numerous free hosting websites including [GitHub Pages](https://docs.github.com/en/free-pro-team@latest/github/working-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site).
-4. we already provide a workflow that auto-deploys our app to GitHub pages if you enable it.
-> To enable Github Pages, you need to go to Repository -> Settings -> Pages -> Source -> set to `gh-pages` branch and `/` (root).
->
-> If `gh-pages` is not available in `Source`, just create and push a branch called `gh-pages` and it should be available.
->
-> If you renamed the `main` branch to something else (say you re-initialized the repository with `master` as the initial branch), be sure to edit the github workflows `.github/workflows/pages.yml` file to reflect the change
-> ```yml
-> on:
->   push:
->     branches:
->       - <branch name>
-> ```
+```
+hackem v1.0 <halt_addr_hex>
+ROM@<hex_offset>
+<hex_word>
+...
+RAM@<hex_offset>
+<hex_word>
+...
+```
 
-You can test the template app at <https://emilk.github.io/eframe_template/>.
+Example:
+```
+hackem v1.0 0x000e
+ROM@0000
+0002
+8c10
+0011
+...
+RAM@0000
+0000
+```
 
-## Updating egui
+### `.hack` — raw binary
 
-As of 2023, egui is in active development with frequent releases with breaking changes. [eframe_template](https://github.com/emilk/eframe_template/) will be updated in lock-step to always use the latest version of egui.
+One 16-bit instruction per line in binary (`0`/`1` characters), no header. Loaded directly into ROM starting at address 0.
 
-When updating `egui` and `eframe` it is recommended you do so one version at the time, and read about the changes in [the egui changelog](https://github.com/emilk/egui/blob/master/CHANGELOG.md) and [eframe changelog](https://github.com/emilk/egui/blob/master/crates/eframe/CHANGELOG.md).
+```
+0000000000000010
+1110110000010000
+...
+```
+
+Load either format with `File → Load Binary` or the `load` command.
+
+---
+
+## Debugger Commands
+
+Type `about` in the console for the full command list. All commands support aliases.
+
+### Execution
+
+| Command | Alias | Description |
+|---------|-------|-------------|
+| `go` | `g` | Run continuously |
+| `stop` | `halt`, `pause` | Break into a running program |
+| `next_instruction` | `ni`, `si` | Step one instruction |
+
+You can also click **⏹ Break** in the toolbar to stop execution.
+
+### Breakpoints
+
+| Command | Alias | Description |
+|---------|-------|-------------|
+| `break <addr>` | `b` | Set breakpoint |
+| `list_breakpoints` | `lbp` | List all breakpoints |
+| `delete_breakpoint [addr]` | `dbp` | Delete one or all breakpoints |
+
+### Watchpoints
+
+| Command | Alias | Description |
+|---------|-------|-------------|
+| `watch <addr> [-r] [-w]` | `w` | Set watchpoint (default: rw) |
+| `list_watchpoints` | `lwp` | List all watchpoints |
+| `delete_watchpoint [addr]` | `dwp` | Delete one or all watchpoints |
+
+### Memory & Registers
+
+| Command | Alias | Description |
+|---------|-------|-------------|
+| `reg` | | Display PC, A, D registers |
+| `dis [addr] [-n N]` | | Disassemble N instructions (default 16) from addr or PC |
+| `mem <addr> [-n N]` | `m` | Hex dump N words from addr |
+| `print <addr> [-i\|-s]` | `p` | Print value as integer or string |
+| `write_memory <addr> <val>` | `wm` | Write a value to RAM |
+
+### Symbols & Expressions
+
+| Command | Alias | Description |
+|---------|-------|-------------|
+| `load_code <file>` | `load` | Load `.hx` or `.hack` binary |
+| `load_pdb <file>` | `pdb` | Load debug symbol database (JSON) |
+| `list_symbols [filter]` | `lsy` | List PDB symbols, optional substring filter |
+| `expr <expression>` | | Evaluate an expression |
+| `cd <dir>` | | Change working directory |
+
+### Address Syntax
+
+Addresses are accepted in several forms wherever `<addr>` appears:
+
+| Format | Example | Meaning |
+|--------|---------|---------|
+| Hex with `$` | `$1a2b` | 0x1A2B |
+| Hex with `0x` | `0x1a2b` | 0x1A2B |
+| Decimal | `8192` | 8192 |
+| Symbol name | `main` | Looked up from loaded PDB |
+| `=<expression>` | `=base+4` | Evaluated by expression engine |
+
+---
+
+## Memory Map
+
+| Range | Description |
+|-------|-------------|
+| `0x0000–0x7FFF` | ROM (32 KB, read-only at runtime) |
+| `0x0000–0x3FFF` | RAM (general purpose) |
+| `0x4000–0x5FFF` | Screen (512×256 pixels, 1 bit/pixel) |
+| `0x6000` | Keyboard (current key code, read-only) |
+| `0x7FFF` | Output port (write ASCII bytes; shown in console) |
+
+---
+
+## CI
+
+```sh
+cargo check --workspace --all-targets
+cargo check --workspace --all-features --lib --target wasm32-unknown-unknown
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace --all-targets --all-features
+typos   # spell check (cargo install typos-cli)
+```
+
+---
+
+## Project Structure
+
+```
+src/
+  main.rs              Entry point (native + wasm32 cfg-gated)
+  utils.rs             say!/verbose! macros, SAY_CB output routing
+  ui/
+    app.rs             Main app: owns HackSystem, all windows, Shell
+    widgets/
+      console.rs       Terminal console (history, reverse-search)
+      cpu.rs           CPU register display
+      screen.rs        Hack screen renderer
+      code.rs          Disassembly / code view
+      data.rs          Memory hex viewer
+    key_lookup.rs      egui key → Hack keyboard code
+  emulator/
+    engine.rs          HackEngine: ALU, fetch/decode/execute, breakpoints
+    code_loader.rs     .hx and raw binary loader
+  debugger/
+    debug_em.rs        HackSystem: wraps engine + PDB, address resolution
+    shell.rs           Command dispatcher
+    syntax.rs          clap command definitions
+    expr.rs            Expression evaluator
+    pdbio.rs           PDB I/O helpers
+common/                Sibling crate — Pdb debug symbol/type database
+```
+
+---
+
+## License
+
+Licensed under either of [Apache License 2.0](LICENSE-APACHE) or [MIT License](LICENSE-MIT) at your option.
+
