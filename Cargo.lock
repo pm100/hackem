@@ -1116,7 +1116,8 @@ dependencies = [
 
 [[package]]
 name = "egui_console"
-version = "0.3.1"
+version = "0.4.0"
+source = "git+https://github.com/pm100/egui_console#d55ff10a78f38c5891527fff2d137bf1eb090322"
 dependencies = [
  "eframe",
  "egui",
@@ -2165,7 +2166,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "07033963ba89ebaf1584d767badaa2e8fcec21aedea6b8c0346d487d49c28667"
 dependencies = [
  "cfg-if",
- "windows-targets 0.53.3",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
@@ -4511,7 +4512,7 @@ version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0978bf7171b3d90bac376700cb56d606feb40f251a475a5d6634613564460b22"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
